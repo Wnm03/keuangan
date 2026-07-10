@@ -53,7 +53,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <title>Keluarga W</title>
-<link rel="stylesheet" href="styles.css?v=122">
+<link rel="stylesheet" href="styles.css?v=127">
 <script>
 /* Debug console (Eruda) — aktifkan sekali lewat ?debug=1 di URL, nempel via localStorage.
    Matikan lagi lewat ?debug=0. Tidak aktif buat user biasa. */
@@ -105,8 +105,8 @@ b.appendChild(closeBtn);
 }catch(_e){ console.error('Gagal tampilkan banner error modul:',_e); }
 };
 </script>
-<script src="app-bundle-a.min.js?v=122" onerror="window.__moduleLoadFail('app-bundle-a.min.js')"></script>
-<script src="smoke-test.js?v=122" defer></script>
+<script src="app-bundle-a.min.js?v=127" onerror="window.__moduleLoadFail('app-bundle-a.min.js')"></script>
+<script src="smoke-test.js?v=127" defer></script>
 <link rel="manifest" id="pwaManifestLink" href="manifest.json">
 </head>
 <body data-theme="dark">
@@ -190,15 +190,24 @@ b.appendChild(closeBtn);
     <div class="u-flex1"><div class="u-fs12 u-fw700 u-cacc2" id="billBannerTitle">Tagihan jatuh tempo</div><div id="billBannerSub" class="u-fs12t2">-</div></div>
     <button class="btn btn-sm u-cacc2 u-fs12" style="background:var(--accent2-soft);border:1px solid var(--accent2)" data-onclick="showPage('settings',document.querySelector('[onclick*=settings]'))">Lihat</button>
   </div>
-  <div class="card u-mb12 u-dnone" id="finCoachCard"></div>
-  <div class="card u-mb12" id="aiWidgetCard" style="background:linear-gradient(135deg,var(--accent-soft),var(--surface2));border:1px solid var(--accent)">
-    <div class="card-title">🧭 Rekomendasi AI <span class="u-flexc8"><span class="card-collapse-toggle" id="aiWidgetCard-chev" data-action="toggleCardCollapse" data-args='["aiWidgetCard","$event"]' aria-label="Buka/tutup bagian">▾</span></span></div>
-    <div class="card-collapse-body" id="aiWidgetCard-cbody">
-    <div class="u-fs11 u-t2 u-mb10 u-lh15">Satu laporan AI: analisis penasihat keuangan, bisnis &amp; investasi, dan pola hidup-kerja — dirangkum dari semua data kamu di app ini.</div>
-    <div id="aiWidgetBody"></div>
-    <div class="u-flex u-gap8 u-mt10">
-      <button class="btn btn-primary btn-sm u-flex1" id="aiWidgetGenBtn" data-action="AIWidget.generate">🔍 Buat/Perbarui Analisis</button>
-      <button class="btn btn-ghost btn-sm u-flex1" data-action="AIWidget.openChat">💬 Konsultasi AI</button>
+  <div class="card u-mb12" id="advisorCard" style="background:linear-gradient(135deg,var(--accent-soft),var(--surface2));border:1px solid var(--accent)">
+    <div class="card-title">🧭 Penasihat <span class="u-flexc8"><span class="card-collapse-toggle" id="advisorCard-chev" data-action="toggleCardCollapse" data-args='["advisorCard","$event"]' aria-label="Buka/tutup bagian">▾</span></span></div>
+    <div class="card-collapse-body" id="advisorCard-cbody">
+    <div class="u-flex u-gap6 u-mb10">
+      <button class="chip-btn u-flex1" id="advisorTabBtn-coach" data-action="Advisor.setTab" data-args='["coach"]'>🩺 Insight Cepat</button>
+      <button class="chip-btn u-flex1" id="advisorTabBtn-report" data-action="Advisor.setTab" data-args='["report"]'>🔍 Laporan AI</button>
+    </div>
+    <div id="advisorPanel-coach">
+      <div class="u-fs11 u-t2 u-mb8 u-lh15">Insight otomatis dari data kamu sendiri — gratis, tanpa panggil AI, langsung dihitung tiap buka Beranda.</div>
+      <div id="finCoachBody"></div>
+    </div>
+    <div id="advisorPanel-report" class="u-dnone">
+      <div class="u-fs11 u-t2 u-mb10 u-lh15">Satu laporan AI: analisis penasihat keuangan, bisnis &amp; investasi, dan pola hidup-kerja — dirangkum dari semua data kamu di app ini.</div>
+      <div id="aiWidgetBody"></div>
+      <div class="u-flex u-gap8 u-mt10">
+        <button class="btn btn-primary btn-sm u-flex1" id="aiWidgetGenBtn" data-action="AIWidget.generate">🔍 Buat/Perbarui Analisis</button>
+        <button class="btn btn-ghost btn-sm u-flex1" data-action="AIWidget.openChat">💬 Konsultasi AI</button>
+      </div>
     </div>
     </div>
   </div>
@@ -359,7 +368,7 @@ b.appendChild(closeBtn);
   </div>
   <div class="card"><div class="card-title">📋 Transaksi Terakhir</div><div id="recentTx"><div class="empty"><div class="empty-icon">💸</div><div class="empty-text">Belum ada transaksi</div><div class="u-mt10 u-flex u-gap8 u-jcc"><button class="btn btn-income btn-sm" data-action="openTxModal" data-args='["income"]'>+ Catat Pemasukan</button><button class="btn btn-expense btn-sm" data-action="openTxModal" data-args='["expense"]'>- Catat Pengeluaran</button></div></div></div></div>
   <div class="card u-dnone" id="siapPulangCard"></div>
-  <div class="ldr-card" style="padding:14px 16px">
+  <div class="ldr-card" id="ldrCard" style="padding:14px 16px">
     <div class="u-flex u-aic u-jcb u-mb2">
       <div class="ldr-label u-mb0">✈️ Pulang ke Pekalongan</div>
       <div class="u-flex u-gap4" style="align-items:baseline"><span class="ldr-days" id="ldrNum" style="font-size:24px">?</span><span class="ldr-unit u-fs12" id="ldrUnit">hari</span></div>
@@ -729,15 +738,58 @@ b.appendChild(closeBtn);
   </div>
 
   <div class="cn-tabs" style="overflow-x:auto;flex-wrap:nowrap;-webkit-overflow-scrolling:touch">
-    <button class="cn-tab active tab-fixed-pad" data-action="setCobekTab" data-args='["jual", "$el"]'>🛒 Transaksi</button>
+    <button class="cn-tab active tab-fixed-pad" data-action="setCobekTab" data-args='["kasir", "$el"]'>🧠 Kasir AI</button>
+    <button class="cn-tab tab-fixed-pad" data-action="setCobekTab" data-args='["jual", "$el"]'>🛒 Manual</button>
     <button class="cn-tab tab-fixed-pad" data-action="setCobekTab" data-args='["etalase", "$el"]'>📦 Etalase</button>
     <button class="cn-tab tab-fixed-pad" data-action="setCobekTab" data-args='["produsen", "$el"]'>🏭 Produsen</button>
     <button class="cn-tab tab-fixed-pad" data-action="setCobekTab" data-args='["riwayat", "$el"]'>📋 Riwayat</button>
     <button class="cn-tab tab-fixed-pad" data-action="setCobekTab" data-args='["pelanggan", "$el"]'>👤 Pelanggan</button>
   </div>
 
-  <!-- TRANSAKSI / JUAL -->
-  <div id="cobekTab-jual">
+  <!-- KASIR AI (baru, v127) -->
+  <div id="cobekTab-kasir">
+    <div class="search-wrap u-mb10">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="position:absolute;left:13px;top:50%;transform:translateY(-50%);width:16px;height:16px;color:var(--text3)"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+      <input class="fi" id="kasirSearch" style="padding-left:38px" placeholder="Cari produk..." oninput="Kasir.onSearch(this.value)" autocomplete="off">
+    </div>
+    <div class="u-flex u-gap8 u-mb10" id="kasirPriceToggle">
+      <button type="button" class="chip-btn active u-flex1" data-action="Kasir.setPriceType" data-args='["jual", "$el"]'>Harga Jual</button>
+      <button type="button" class="chip-btn u-flex1" data-action="Kasir.setPriceType" data-args='["reseller", "$el"]'>Harga Reseller</button>
+    </div>
+    <div class="kasir-grid" id="kasirGrid"></div>
+
+    <div class="card u-mt12" id="kasirAiCard" style="display:none">
+      <div class="card-title">🤖 Saran AI Kasir</div>
+      <div id="kasirAiBody"></div>
+    </div>
+
+    <div class="div"></div>
+    <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">🛒 Keranjang <button type="button" class="card-setting-btn" data-action="Kasir.aiSuggest">🤖 Saran AI</button></div>
+    <div id="kasirCartList" class="u-mb10"></div>
+
+    <div class="u-grid2">
+      <div class="fg"><label class="fl">Diskon (Rp)</label><input type="number" class="fi" id="kasirDiskon" placeholder="0" inputmode="numeric" oninput="Kasir.renderCart()"></div>
+      <div class="fg"><label class="fl">Ongkos Kirim (Rp)</label><input type="number" class="fi" id="kasirOngkir" placeholder="0" inputmode="numeric" oninput="Kasir.renderCart()"></div>
+    </div>
+    <div class="fg"><label class="fl">Nama Pembeli (opsional)</label><input type="text" class="fi" id="kasirCustName" placeholder="Bu Rina" autocomplete="off"></div>
+    <div class="fg"><label class="fl">No. HP (opsional)</label><input type="text" class="fi" id="kasirCustPhone" placeholder="08xx" autocomplete="off"></div>
+    <div class="fg"><label class="fl">Uang Masuk ke Akun</label><select class="fs" id="kasirAcc"></select></div>
+    <div class="fg"><label class="fl">Catatan (opsional)</label><input type="text" class="fi" id="kasirNote" placeholder="Catatan tambahan..."></div>
+
+    <div class="gaji-result" style="display:block;margin-bottom:14px">
+      <div style="font-size:12px;color:var(--text2);margin-bottom:4px">Total Tagihan</div>
+      <div class="gaji-result-main" id="kasirTotalDisplay">Rp 0</div>
+      <div id="kasirProfitDisplay" style="font-size:12px;color:var(--text2);margin-top:4px">Estimasi untung: Rp 0</div>
+    </div>
+    <button class="btn btn-primary btn-full u-p14" id="kasirCheckoutBtn" data-action="Kasir.checkout" disabled>✅ Bayar &amp; Simpan Transaksi</button>
+    <div class="u-flex u-gap8 u-mt8">
+      <button class="btn btn-ghost btn-full btn-sm" data-action="Kasir.shareReceipt">📤 Bagikan Struk</button>
+      <button class="btn btn-ghost btn-full btn-sm" data-action="Kasir.reset">🗑 Kosongkan</button>
+    </div>
+  </div>
+
+  <!-- TRANSAKSI / JUAL (manual, cara lama — tetap ada sbg fallback) -->
+  <div id="cobekTab-jual" class="u-dnone">
     <button class="btn btn-primary btn-full" style="padding:14px;margin:12px 0" data-action="openOrderModal" aria-label="Edit/Buka">+ Transaksi Baru</button>
     <div class="card"><div class="card-title">⚡ Transaksi Terakhir</div><div id="cobekRecentList"><div class="empty"><div class="empty-icon">🪨</div><div class="empty-text">Belum ada transaksi</div></div></div></div>
   </div>
@@ -1306,6 +1358,12 @@ b.appendChild(closeBtn);
       <div class="theme-card" data-action="setTheme" data-args='["auto"]' data-t="auto" title="Ganti otomatis: Light jam 06.00–18.00, Dark di luar jam itu — ikut waktu di HP ini"><div class="theme-card-preview" style="background:linear-gradient(135deg,#1a1a2e 50%,#f0f0f8 50%)">🌗</div><div class="theme-card-name">Otomatis</div></div>
     </div>
     <div class="u-fs12 u-t2 u-mt8 u-lh15">Mode Otomatis ganti ke tema terang jam 06.00–18.00 dan tema gelap di luar jam itu.</div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">🧩 Kartu di Beranda</div>
+    <div class="u-hint10">Matikan kartu yang tidak kamu pakai (mis. Sewa Kios, Pensiun, Dana Pendidikan, Jadwal Pulang) — kartunya hilang dari Beranda DAN berhenti dihitung tiap buka Beranda, jadi lebih ringan. Kartu inti (Penasihat, Skor Hidup Seimbang, Saldo Akun, Transaksi Terakhir) selalu tampil.</div>
+    <div id="dashCardPrefsList"></div>
   </div>
 
   </div></div>
@@ -2040,6 +2098,6 @@ b.appendChild(closeBtn);
 <script>document.write(MODAL_HTML[64]);</script><!-- modal:budgetSettingsModal externalized to modals.js -->
 <script>document.write(MODAL_HTML[65]);</script><!-- modal:refleksiModal (Refleksi & Self-Care) -->
 
-<script src="app-bundle-b.min.js?v=122" onerror="window.__moduleLoadFail('app-bundle-b.min.js')"></script>
+<script src="app-bundle-b.min.js?v=127" onerror="window.__moduleLoadFail('app-bundle-b.min.js')"></script>
 </body>
 </html>

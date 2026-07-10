@@ -28,8 +28,8 @@ if(location.hostname==='localhost'||location.hostname==='127.0.0.1')return true;
 }catch(e){ /* anggap bukan dev mode kalau gagal deteksi */ }
 return false;
 }
-const APP_BUILD_VERSION = 'kw78-fincoach-proaktif';
-const PRODUCTION_BUILD_SYNCED_VERSION = 'kw78-fincoach-proaktif';
+const APP_BUILD_VERSION = 'kw80-merge-advisor-card-dashcards-3';
+const PRODUCTION_BUILD_SYNCED_VERSION = 'kw80-merge-advisor-card-dashcards-3';
 let D = {
 schemaVersion:SCHEMA_VERSION,
 transactions:[],cobek:[],products:[],produsen:[],cobekKategori:JSON.parse(JSON.stringify(DEFAULT_COBEK_KATEGORI)),targets:[],eduFunds:[],reminders:[],bills:[],billsArchive:[],
@@ -52,6 +52,7 @@ chatHistory:[],
 aiWidgetReport:null,
 budgets:[],
 notifSettings:{enabled:false,billDays:3,ldrDays:3},
+dashCardPrefs:{},
 googleDrive:{clientId:'',fileId:null,lastSync:null,autoSync:false},
 googleSheets:{spreadsheetId:'',lastSync:null},
 archiveHistory:[],

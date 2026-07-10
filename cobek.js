@@ -1172,7 +1172,8 @@ function openStockRekoWidgetDetail(id,restockQty){return StockRekoWidget.openDet
 function setCobekTab(t,el){
 document.querySelectorAll('#page-cobek .cn-tab').forEach(b=>b.classList.remove('active'));
 el.classList.add('active');
-['jual','etalase','produsen','riwayat','pelanggan'].forEach(x=>{const elx=document.getElementById('cobekTab-'+x);if(elx){elx.classList.toggle('u-dnone', x!==t);elx.style.display='';}});
+['kasir','jual','etalase','produsen','riwayat','pelanggan'].forEach(x=>{const elx=document.getElementById('cobekTab-'+x);if(elx){elx.classList.toggle('u-dnone', x!==t);elx.style.display='';}});
+if(t==='kasir')Kasir.render();
 if(t==='etalase')renderProductList();
 if(t==='produsen')renderProdusenList();
 if(t==='riwayat'){renderCobek();renderCobekGrafik();}

@@ -1,5 +1,5 @@
 
-const MODULE_CALC_VERSION='kw78-fincoach-proaktif';
+const MODULE_CALC_VERSION='kw80-merge-advisor-card-dashcards-3';
 const FI={
 assetScopeState:'zakatable',
 investmentAssetValue(){
@@ -587,12 +587,19 @@ el.innerHTML=`
 // menggabungkan beberapa sinyal itu jadi SATU widget ringkasan di paling atas Dashboard.
 const FinCoach={
 DISMISS_LS_KEY:'kw_fincoach_dismissed',
-compute(){
+compute(ctx){
 const out=[];
-const now=new Date(),m=now.getMonth(),y=now.getFullYear();
-const txM=D.transactions.filter(t=>{const d=new Date(t.date);return d.getMonth()===m&&d.getFullYear()===y;});
-const inc=txM.filter(t=>t.type==='income').reduce((s,t)=>s+t.amount,0);
-const exp=txM.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0);
+// ctx (opsional) dioper dari renderDashboard() di modules-render.js supaya txM/inc/exp/billStats
+// tidak dihitung ulang di sini kalau sudah dihitung di sana (1x scan D.transactions/D.bills per
+// buka Dashboard, bukan 2x). Kalau dipanggil tanpa ctx (mis. dari FinCoach.dismiss()/showAll()
+// yang tidak lewat renderDashboard()), tetap hitung sendiri sebagai fallback — supaya modul ini
+// tetap bisa dipanggil independen kapan saja.
+const now=(ctx&&ctx.now)||new Date();
+const m=(ctx&&ctx.m!=null)?ctx.m:now.getMonth();
+const y=(ctx&&ctx.y!=null)?ctx.y:now.getFullYear();
+const txM=(ctx&&ctx.txM)||D.transactions.filter(t=>{const d=new Date(t.date);return d.getMonth()===m&&d.getFullYear()===y;});
+const inc=(ctx&&ctx.inc!=null)?ctx.inc:txM.filter(t=>t.type==='income').reduce((s,t)=>s+t.amount,0);
+const exp=(ctx&&ctx.exp!=null)?ctx.exp:txM.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0);
 // 1. Defisit bulan berjalan (pengeluaran > pemasukan bulan ini)
 if(inc>0&&exp>inc){
 out.push({id:'defisit',level:'danger',icon:'🔴',text:`Bulan ini pengeluaran (${fmtFull(exp)}) sudah melebihi pemasukan (${fmtFull(inc)}) — defisit ${fmtFull(exp-inc)}.`,action:{label:'Cek Laporan',page:'keuangan',navIdx:1}});
@@ -611,10 +618,11 @@ out.push({id:'budget-'+r.b.id,level:over?'danger':'warning',icon:over?'🔴':'�
 }
 }
 }catch(e){console.warn('FinCoach: gagal cek anggaran',e);}
-// 3. Tagihan telat/segera jatuh tempo (pakai getBillStats() yg sudah ada, dipakai jg di dashBillCard)
+// 3. Tagihan telat/segera jatuh tempo (pakai getBillStats() yg sudah ada, dipakai jg di dashBillCard —
+// atau reuse ctx.billStats kalau sudah dihitung sekali oleh renderDashboard(), lihat catatan di atas)
 try{
-if(typeof getBillStats==='function'){
-const s=getBillStats();
+const s=(ctx&&ctx.billStats)||(typeof getBillStats==='function'?getBillStats():null);
+if(s){
 if(s.overdueCount>0){
 out.push({id:'bill-overdue',level:'danger',icon:'🔴',text:`${s.overdueCount} tagihan/cicilan sudah lewat jatuh tempo (estimasi sisa tunggakan ${fmtFull(s.outstanding)}).`,action:{label:'Bayar Sekarang',page:'settings',navIdx:6}});
 } else if(s.soonCount>0){
@@ -694,33 +702,27 @@ if(!cur.includes(id))cur.push(id);
 try{localStorage.setItem(FinCoach.DISMISS_LS_KEY,JSON.stringify(cur.slice(-40)));}catch(e){}
 FinCoach.renderDash();
 },
-renderDash(){
-const card=document.getElementById('finCoachCard');
-if(!card)return;
+renderDash(ctx){
+const body=document.getElementById('finCoachBody');
+if(!body)return;
 let insights;
-try{ insights=FinCoach.compute(); }catch(e){ console.warn('FinCoach: gagal hitung insight',e); insights=[]; }
+try{ insights=FinCoach.compute(ctx); }catch(e){ console.warn('FinCoach: gagal hitung insight',e); insights=[]; }
 const dismissed=FinCoach.dismissedIds();
 insights=insights.filter(x=>!dismissed.includes(x.id));
-card.classList.remove('u-dnone');card.style.display='block';
+const tabBtn=document.getElementById('advisorTabBtn-coach');
+if(tabBtn)tabBtn.textContent='🩺 Insight Cepat'+(insights.length?` (${insights.length})`:'');
 if(!insights.length){
-card.innerHTML=`<div class="card-title">🩺 AI Financial Coach <span class="card-collapse-toggle" id="finCoachCard-chev" data-action="toggleCardCollapse" data-args='["finCoachCard","$event"]' aria-label="Buka/tutup bagian">▾</span></div>
-    <div class="card-collapse-body" id="finCoachCard-cbody"><div class="u-fs12 u-t2 u-lh15">Belum cukup data buat cek insight otomatis. Catat transaksi rutin dulu ya, insight bakal muncul otomatis di sini.</div></div>`;
-applyOneCardCollapsePref('finCoachCard');
+body.innerHTML=`<div class="u-fs12 u-t2 u-lh15">Belum cukup data buat cek insight otomatis, atau semua indikator sudah aman. Catat transaksi rutin dulu ya, insight bakal muncul otomatis di sini.</div>`;
 return;
 }
 const top=insights.slice(0,4);
 const colFor={danger:'var(--accent2)',warning:'var(--accent4)',info:'var(--accent)',good:'var(--accent3)'};
-card.innerHTML=`<div class="card-title">🩺 AI Financial Coach <span class="acc-chip u-cacc2" style="border-color:var(--accent2)">${insights.length}</span> <span class="card-collapse-toggle" id="finCoachCard-chev" data-action="toggleCardCollapse" data-args='["finCoachCard","$event"]' aria-label="Buka/tutup bagian">▾</span></div>
-    <div class="card-collapse-body" id="finCoachCard-cbody">
-    <div class="u-fs11 u-t2 u-mb8 u-lh15">Insight otomatis dari data kamu sendiri — gratis, tanpa panggil AI, langsung dihitung tiap buka Beranda.</div>`
-+top.map(x=>`
+body.innerHTML=top.map(x=>`
       <div class="u-flex u-gap8 u-mb8" style="align-items:flex-start;border-left:3px solid ${colFor[x.level]};padding-left:8px">
         <div class="u-flex1 u-fs12 u-lh15">${x.icon} ${x.text}${x.action?` <span class="u-cacc u-pointer u-fw700" data-action="showPage" data-args='["${x.action.page}","$nav:${x.action.navIdx}"]'>${escapeHtml(x.action.label)} →</span>`:''}</div>
         <span class="u-fs11 u-pointer" style="color:var(--text3)" data-stop="1" data-action="FinCoach.dismiss" data-args="${escapeHtml(JSON.stringify([x.id]))}" title="Sembunyikan" aria-label="Sembunyikan">✕</span>
       </div>`).join('')
-+(insights.length>top.length?`<div class="u-fs12 u-cacc u-tar u-pointer" data-action="FinCoach.showAll">Lihat semua (${insights.length}) →</div>`:'')
-+`</div>`;
-applyOneCardCollapsePref('finCoachCard');
++(insights.length>top.length?`<div class="u-fs12 u-cacc u-tar u-pointer" data-action="FinCoach.showAll">Lihat semua (${insights.length}) →</div>`:'');
 },
 showAll(){
 const insights=FinCoach.compute().filter(x=>!FinCoach.dismissedIds().includes(x.id));

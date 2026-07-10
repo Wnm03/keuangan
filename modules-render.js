@@ -1,7 +1,7 @@
 // Fungsi render (85 fungsi) dipisah dari app_production.html untuk pemerataan ukuran file.
 // Semua fungsi ini murni definisi function global (bukan module), jadi tetap bisa dipanggil dari file manapun
 // yang loadnya belakangan (sama seperti modules-calc.js/features-*.js).
-const MODULE_RENDER_VERSION='kw78-fincoach-proaktif';
+const MODULE_RENDER_VERSION='kw80-merge-advisor-card-dashcards-3';
 
 function renderPageContent(name){
 if(name==='dashboard')renderDashboard();
@@ -10,7 +10,7 @@ populateKeuFilters();loadKeuFilterPrefsIntoDOM();renderKeuangan();renderBillList
 const lapTab=document.getElementById('keuanganTab-laporan');
 if(lapTab&&lapTab.style.display!=='none'){populateCatFilter();populateAccFilters();renderLaporan();}
 }
-if(name==='cobek'){renderCobekRecent();renderProductList();renderCobek();}
+if(name==='cobek'){renderCobekRecent();renderProductList();renderCobek();if(typeof Kasir!=='undefined')Kasir.render();}
 if(name==='laporan'){populateCatFilter();populateAccFilters();renderLaporan();}
 if(name==='carnotes'){renderVehicleSelect();renderCnTab();}
 if(name==='ai')initChat();
@@ -373,11 +373,11 @@ dayListEl.innerHTML=`<div class="u-fs12 u-t2 u-mb8">${dLabel} · ${selList.lengt
 }
 }
 
-function renderDashboardBills(){
+function renderDashboardBills(billStats){
 const card=document.getElementById('dashBillCard');if(!card)return;
 if(!D.bills.length){card.style.display='none';return;}
 card.classList.remove('u-dnone');card.style.display='block';
-const s=getBillStats();
+const s=billStats||getBillStats();
 document.getElementById('dashBillMonthTotal').textContent=fmt(s.monthTotal);
 document.getElementById('dashBillUpcomingCount').textContent=s.soonCount;
 document.getElementById('dashBillOutstanding').textContent=fmt(s.outstanding);
@@ -541,14 +541,94 @@ if(card)card.style.display='none';
 toast('Oke, tidak akan diingatkan lagi. Kamu tetap bisa aktifkan backup kapan saja lewat Pengaturan.');
 }
 
+// Daftar card Dashboard yang BOLEH disembunyikan user lewat Pengaturan → Tampilan → Kartu di
+// Beranda. Ini satu-satunya sumber data buat checklist di Pengaturan (renderDashCardPrefsUI) DAN
+// buat renderDashboard() memutuskan mana yang di-skip. Card "inti" (Penasihat, Skor Hidup
+// Seimbang, saldo bulan ini, Saldo Akun, Transaksi Terakhir) sengaja TIDAK dimasukkan sini —
+// selalu tampil karena jadi acuan utama tiap buka Beranda.
+// Field `render(ctx)`: dipanggil renderDashboard() kalau card ini aktif (isDashCardOn). `ctx`
+// berisi konteks bulan-berjalan yang sudah dihitung sekali di renderDashboard() (now/m/y/txM/
+// inc/exp/billStats) — dipakai kalau card butuh (mis. laporanMini, zakatMini, bill), diabaikan
+// kalau tidak. Urutan render sesungguhnya (beda dari urutan checklist Pengaturan di bawah, yang
+// sengaja dikelompokkan per tema) diatur lewat DASH_RENDER_ORDER, bukan urutan array ini.
+const DASH_CARD_DEFS=[
+{key:'bill',label:'🔔 Tagihan & Cicilan',elId:'dashBillCard',render:(ctx)=>renderDashboardBills(ctx.billStats)},
+{key:'servisReminder',label:'🔧 Pengingat Servis Kendaraan',elId:'dashServisReminderCard',render:()=>renderDashboardServisReminder()},
+{key:'sewaKiosReminder',label:'🏠 Pengingat Tagih Sewa Kios',elId:'dashSewaKiosReminderCard',render:()=>renderDashboardSewaKiosReminder()},
+{key:'backupReminder',label:'☁️ Pengingat Backup Belum Aktif',elId:'dashBackupReminderCard',render:()=>renderDashboardBackupReminder()},
+{key:'danaDarurat',label:'🛟 Dana Darurat',elId:'dashDanaDaruratCard',render:()=>DanaDaruratAI.renderDash()},
+{key:'cashflowForecast',label:'📉 Proyeksi Arus Kas',elId:'cashflowForecastCard',render:()=>renderDashCashflowForecast()},
+{key:'timeline',label:'🗓️ Linimasa Prioritas Keuangan',elId:'timelineWCard',render:()=>TimelineW.render()},
+{key:'budgetMini',label:'📊 Anggaran Bulan Ini',elId:'dashBudgetMiniCard',render:()=>renderDashBudgetMini()},
+{key:'eduFund',label:'🎓 Dana Pendidikan',elId:'dashEduFundMiniCard',render:()=>EduFund.renderDashMini()},
+{key:'zakatMini',label:'🕌 Zakat Penghasilan',elId:'dashZakatMiniCard',render:(ctx)=>renderDashZakatMini(ctx.inc)},
+{key:'fi',label:'🎯 Kebebasan Finansial',elId:'dashFiCard',render:()=>renderFinancialFreedom()},
+{key:'pensiun',label:'🏖️ Dana Pensiun',elId:'dashPensiunCard',render:()=>Pensiun.renderDashMini()},
+{key:'absensi',label:'📅 Absensi Harian',elId:'dashAbsensiCard',render:()=>Payroll.renderDashMini()},
+{key:'laporanMini',label:'📊 Ringkasan Laporan Bulan Ini',elId:'dashLaporanMiniCard',render:(ctx)=>renderDashLaporanMini(ctx.inc,ctx.exp,ctx.txM)},
+{key:'refleksi',label:'🌱 Refleksi & Self-Care',elId:'refleksiCard',render:()=>Refleksi.renderDashCard()},
+{key:'siapPulang',label:'🪨 Siap Pulang (Untung Shop)',elId:'siapPulangCard',render:()=>renderSiapPulang()},
+{key:'ldr',label:'✈️ Siklus Kerja & Jadwal Pulang',elId:'ldrCard',render:()=>renderLDR()},
+];
+// Urutan render sesungguhnya di Beranda (beda dari urutan checklist Pengaturan di
+// DASH_CARD_DEFS). Dipisah dari DASH_CARD_DEFS supaya menambah/menyusun ulang checklist
+// Pengaturan tidak diam-diam mengubah urutan tampilan Beranda, begitu juga sebaliknya.
+const DASH_RENDER_ORDER=['ldr','siapPulang','bill','servisReminder','sewaKiosReminder','backupReminder','danaDarurat','cashflowForecast','timeline','zakatMini','budgetMini','laporanMini','fi','pensiun','absensi','eduFund','refleksi'];
+const DASH_CARD_BY_KEY={};
+DASH_CARD_DEFS.forEach(c=>{DASH_CARD_BY_KEY[c.key]=c;});
+function isDashCardOn(key){
+return !(D.dashCardPrefs && D.dashCardPrefs[key]===false);
+}
+function hideDashCardEl(elId){
+const el=document.getElementById(elId);
+if(!el)return;
+el.classList.add('u-dnone');
+el.style.display='none';
+}
+function renderDashCardPrefsUI(){
+const wrap=document.getElementById('dashCardPrefsList');
+if(!wrap)return;
+wrap.innerHTML=`<div class="u-flex u-gap8 u-mb10">
+      <button type="button" class="btn btn-ghost btn-sm u-flex1" onclick="setAllDashCardPrefs(true)">✅ Aktifkan Semua</button>
+      <button type="button" class="btn btn-ghost btn-sm u-flex1" onclick="setAllDashCardPrefs(false)">🚫 Matikan Semua</button>
+    </div>`
++DASH_CARD_DEFS.map(c=>`
+    <div class="setting-item">
+      <div class="setting-label">${c.label}</div>
+      <label class="tgl-switch"><input type="checkbox" ${isDashCardOn(c.key)?'checked':''} onchange="toggleDashCardPref('${c.key}',this.checked)"><span class="tgl-track"></span></label>
+    </div>`).join('');
+}
+function setAllDashCardPrefs(on){
+if(!D.dashCardPrefs)D.dashCardPrefs={};
+DASH_CARD_DEFS.forEach(c=>{if(on)delete D.dashCardPrefs[c.key];else D.dashCardPrefs[c.key]=false;});
+save();
+renderDashCardPrefsUI();
+if(document.getElementById('page-dashboard'))renderDashboard();
+}
+function toggleDashCardPref(key,checked){
+if(!D.dashCardPrefs)D.dashCardPrefs={};
+if(checked)delete D.dashCardPrefs[key]; else D.dashCardPrefs[key]=false;
+save();
+if(document.getElementById('page-dashboard'))renderDashboard();
+}
+
 function renderDashboard(){
 LifeBalance.render();
-if(typeof FinCoach!=='undefined')FinCoach.renderDash();
+// Konteks bulan-berjalan dihitung SEKALI di sini (dulu FinCoach & dashBillCard hitung
+// txM/inc/exp/billStats sendiri-sendiri lagi walau datanya sama persis dengan yang dihitung di
+// bawah buat statistik atas). Dioper ke widget yang butuh (billStatsShared->renderDashboardBills,
+// dashCtx->FinCoach) supaya D.transactions/D.bills tidak di-scan ulang berkali-kali tiap 1x buka
+// Dashboard. Widget lain di bawah (LifeBalance/AIWidget/dst) sengaja TIDAK diikutkan dulu — masing2
+// hitung metrik yang beda (bukan cuma txM/inc/exp bulan ini), digabung nanti kalau memang kepakai bareng.
+if(typeof Advisor!=='undefined')Advisor.render();
 if(typeof AIWidget!=='undefined')AIWidget.render();
 const now=new Date(),m=now.getMonth(),y=now.getFullYear();
 const txM=D.transactions.filter(t=>{const d=new Date(t.date);return d.getMonth()===m&&d.getFullYear()===y;});
 const inc=txM.filter(t=>t.type==='income').reduce((s,t)=>s+t.amount,0);
 const exp=txM.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0);
+const billStatsShared=(typeof getBillStats==='function')?getBillStats():null;
+const dashCtx={now,m,y,txM,inc,exp,billStats:billStatsShared};
+if(typeof FinCoach!=='undefined')FinCoach.renderDash(dashCtx);
 const cobM=D.cobek.filter(t=>{const d=new Date(t.date);return d.getMonth()===m&&d.getFullYear()===y;}).reduce((s,t)=>s+t.profit,0);
 document.getElementById('dIncome').textContent=fmt(inc);
 document.getElementById('dExpense').textContent=fmt(exp);
@@ -557,24 +637,17 @@ bEl.textContent=(bal<0?'-':'')+fmt(bal);bEl.className='stat-val '+(bal>=0?'green
 document.getElementById('dCobek').textContent=fmt(cobM)+(cobM>0?' 📈':'');
 const recent=[...D.transactions].sort((a,b)=>new Date(b.date)-new Date(a.date)).slice(0,5);
 document.getElementById('recentTx').innerHTML=recent.length?recent.map(txHTML).join(''):'<div class="empty"><div class="empty-icon">💸</div><div class="empty-text">Belum ada transaksi</div><div class="u-mt10 u-flex u-gap8 u-jcc"><button class="btn btn-income btn-sm" data-action="openTxModal" data-args=\'["income"]\'>+ Catat Pemasukan</button><button class="btn btn-expense btn-sm" data-action="openTxModal" data-args=\'["expense"]\'>- Catat Pengeluaran</button></div></div>';
-renderLDR();
 renderDashAccList();
-renderSiapPulang();
-renderDashboardBills();
-renderDashboardServisReminder();
-renderDashboardSewaKiosReminder();
-renderDashboardBackupReminder();
-DanaDaruratAI.renderDash();
-renderDashCashflowForecast();
-TimelineW.render();
-renderDashZakatMini(inc);
-renderDashBudgetMini();
-renderDashLaporanMini(inc,exp,txM);
-renderFinancialFreedom();
-Pensiun.renderDashMini();
-Payroll.renderDashMini();
-EduFund.renderDashMini();
-Refleksi.renderDashCard();
+// Card opsional lewat feature registry DASH_CARD_DEFS/DASH_RENDER_ORDER — tiap card dicek dulu ke
+// isDashCardOn() sebelum dihitung/dirender: kalau user matikan lewat Pengaturan → Tampilan →
+// Kartu di Beranda, elemennya disembunyikan DAN fungsi hitungnya SAMA SEKALI TIDAK dipanggil
+// (bukan cuma disembunyikan lewat CSS), jadi fitur yang tidak dipakai (mis. SewaKios/Pensiun)
+// tidak ikut nge-scan data tiap buka Beranda. Urutan render mengikuti DASH_RENDER_ORDER, BUKAN
+// urutan DASH_CARD_DEFS (yang dipakai checklist Pengaturan) — lihat catatan di dekat DASH_CARD_DEFS.
+for(const key of DASH_RENDER_ORDER){
+const cardDef=DASH_CARD_BY_KEY[key];
+if(isDashCardOn(key))cardDef.render(dashCtx);else hideDashCardEl(cardDef.elId);
+}
 }
 
 function renderDashLaporanMini(inc,exp,txM){
@@ -1090,6 +1163,7 @@ const whG=document.getElementById('whGaji'); if(whG) whG.value=D.profile.gajiPok
 const whD=document.getElementById('whDate'); if(whD&&!whD.value) whD.value=new Date().toISOString().split('T')[0];
 renderWorkDays();
 document.querySelectorAll('.theme-card').forEach(c=>c.classList.toggle('active',c.dataset.t===(D.profile.theme||'dark')));
+renderDashCardPrefsUI();
 renderAccGrid();
 renderCatList();
 renderSparepartCatList();

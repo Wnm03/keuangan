@@ -435,6 +435,31 @@ function aiErrorHint(provider,status){
 if(provider==='gemini')return(status===400||status===403)?' (cek API key di Pengaturan)':'';
 return status===401?' (API key salah/expired, cek di Pengaturan)':'';
 }
+// Advisor — pengatur tab utk card gabungan "🧭 Penasihat" (v124, kw80-merge-advisor-card-dashcards-3):
+// dulu FinCoach ("🩺 Insight Cepat", rule-based-gratis-instan) & AIWidget ("🔍 Laporan AI",
+// panggil Claude/Gemini, wajib API key) tampil sbg 2 card TERPISAH di Dashboard — sekarang
+// digabung jadi SATU card dgn 2 tab, supaya tidak terasa ada "2 penasihat AI" yang mirip2.
+// Cuma UI switcher (toggle panel mana yang tampil + simpan preferensi tab terakhir), TIDAK ubah
+// logika FinCoach/AIWidget sama sekali — keduanya tetap modul independen spt sebelumnya, cuma
+// target render-nya sekarang panel di dalam 1 card yang sama (`#finCoachBody`/`#aiWidgetBody`).
+const Advisor={
+LS_KEY:'kw_advisor_tab',
+current(){ try{return localStorage.getItem(Advisor.LS_KEY)||'coach';}catch(e){return'coach';} },
+setTab(tab){
+try{localStorage.setItem(Advisor.LS_KEY,tab);}catch(e){}
+Advisor.render();
+},
+render(){
+const tab=Advisor.current()==='report'?'report':'coach';
+const bC=document.getElementById('advisorTabBtn-coach'),bR=document.getElementById('advisorTabBtn-report');
+const pC=document.getElementById('advisorPanel-coach'),pR=document.getElementById('advisorPanel-report');
+if(!bC||!bR||!pC||!pR)return;
+bC.classList.toggle('active',tab==='coach');
+bR.classList.toggle('active',tab==='report');
+pC.classList.toggle('u-dnone',tab!=='coach');pC.style.display=tab==='coach'?'block':'none';
+pR.classList.toggle('u-dnone',tab!=='report');pR.style.display=tab==='report'?'block':'none';
+}
+};
 const AIWidget={
 generating:false,
 buildContext(){

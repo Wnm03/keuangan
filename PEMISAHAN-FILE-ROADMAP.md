@@ -2062,7 +2062,97 @@ Saya sengaja TIDAK melakukan pemindahan kode itu secara buta di sini karena:
 
 
 
-## Rencana konkret untuk fase berikutnya (per-halaman sungguhan)
+- 🔧 **Refactor: Dashboard hitung konteks bulan-berjalan SEKALI, bukan berkali-kali**
+  (v123, build kw79-dash-ctx-shared): bukan fitur baru — beresin duplikasi hitung yang muncul
+  gara-gara FinCoach (v122) hitung ulang `txM`/`inc`/`exp`/`getBillStats()` sendiri padahal
+  `renderDashboard()` (`modules-render.js`) & `renderDashboardBills()` juga sudah hitung persis
+  data yang sama tiap 1x Dashboard dibuka. Total sebelum refactor ini: `D.transactions` bulan
+  berjalan di-scan 2x (statistik atas + FinCoach) & `getBillStats()` (scan `D.bills`) dipanggil 2x
+  (dashBillCard + FinCoach) per satu kali render Dashboard.
+
+  `renderDashboard()` sekarang hitung `now,m,y,txM,inc,exp` & `billStatsShared=getBillStats()`
+  SEKALI di awal, lalu oper sebagai `dashCtx={now,m,y,txM,inc,exp,billStats}` ke
+  `FinCoach.renderDash(dashCtx)` & `billStatsShared` ke `renderDashboardBills(billStats)`.
+  `FinCoach.compute(ctx)` & `renderDashboardBills(billStats)` sama2 dibuat BACKWARD-COMPATIBLE:
+  parameter opsional — kalau dipanggil TANPA ctx (mis. `FinCoach.dismiss()`/`FinCoach.showAll()`
+  yang tidak lewat `renderDashboard()`), tetap hitung sendiri sbg fallback, jadi kedua fungsi ini
+  tetap aman dipanggil independen kapan saja seperti sebelumnya.
+
+  Widget Dashboard LAIN (LifeBalance, AIWidget, DanaDaruratAI, Cashflow Forecast, TimelineW, Zakat
+  mini, Budget mini, Laporan mini, FI, Pensiun mini) SENGAJA belum diikutkan refactor ini — masing2
+  hitung metrik yang beda dari sekadar txM/inc/exp/billStats bulan ini (macam2 periode/agregasi
+  berbeda), jadi digabung nanti kalau memang ada duplikasi nyata yang kepakai bareng, bukan
+  dipaksa sekaligus supaya risiko regresi tetap kecil per langkah.
+
+  `build.js` TIDAK berubah (tidak ada file baru/pindah grup, cuma ubah kode di 2 file yang sudah
+  ada + ganti 1 signature fungsi jadi optional-parameter).
+
+  Dicek: `node --check` lolos di `modules-render.js` & `modules-calc.js` + kedua bundle, lint
+  bawaan `build.js` (u-dnone vs style.display, field user tanpa escapeHtml) lolos tanpa temuan,
+  `index.html`/`app_production.html` konsisten `?v=123` & identik satu sama lain. **Belum**: tidak
+  bisa dites tampilan/performa sungguhan di browser (tidak ada environment browser di sini) — WAJIB
+  coba manual: buka Dashboard, pastikan SEMUA card yang sebelumnya jalan masih tampil sama persis
+  (statistik atas, card Tagihan, FinCoach) dgn ANGKA YANG SAMA (bukan cuma "muncul", tapi nilainya
+  harus identik dgn sebelum refactor — kalau beda berarti ada bug di ctx yang dioper); coba dismiss
+  1 insight FinCoach & pastikan masih berfungsi normal (jalur tanpa-ctx); buka DevTools Performance
+  tab kalau mau lihat langsung penurunan jumlah pemanggilan `getBillStats()`/scan transaksi per render.
+
+  **Catatan soal saran "esbuild" (belum bisa dikerjakan di sesi ini):** environment sandbox yang
+  dipakai buat sesi ini TIDAK ada akses internet (`npm install` gagal 403 Forbidden ke
+  registry.npmjs.org), jadi tidak bisa pasang `esbuild` & tidak bisa buktikan hasil minifikasi
+  dari sini. Kalau mau ukuran bundle lebih kecil (skrg ~594KB+615KB belum diminify), jalankan
+  SENDIRI di komputer yang ada internet-nya, dari folder proyek ini:
+  ```
+  npm install --save-dev esbuild
+  node build.js
+  ```
+  `build.js` sudah otomatis makai `esbuild` kalau terdeteksi terpasang (lihat komentar di bagian
+  atas file) — tidak perlu ubah kode apapun lagi, tinggal 2 perintah di atas lalu upload ulang
+  kedua file bundle hasilnya.
+
+- ✨ **Gabung FinCoach + AIWidget jadi 1 card "🧭 Penasihat" dgn 2 tab** (v124, build
+  kw80-merge-advisor-card): saran #4 dari sesi sebelumnya — 2 card terpisah di Dashboard
+  ("🩺 AI Financial Coach" & "🧭 Rekomendasi AI") terasa spt 2 penasihat AI yang mirip2, padahal
+  fungsinya beda (FinCoach: rule-based, gratis, instan, tanpa API key vs AIWidget: laporan lengkap
+  1x jalan, WAJIB API key). Digabung jadi 1 card `advisorCard` dgn 2 tab: "🩺 Insight Cepat"
+  (default) & "🔍 Laporan AI", preferensi tab terakhir disimpan di localStorage
+  (`kw_advisor_tab`) via modul baru `Advisor` (`features-aiwidget-reminder-gdrive-search.js`,
+  GROUP_B, ditaruh tepat sebelum `AIWidget`).
+
+  PENTING: ini MURNI penggabungan UI/switcher — logika `FinCoach`/`AIWidget` TIDAK diubah sama
+  sekali, cuma target render-nya yang pindah dari card sendiri2 (`#finCoachCard` full innerHTML
+  incl. judul+collapse, `#aiWidgetCard` sama) jadi 2 panel (`#finCoachBody`/`#aiWidgetBody`) di
+  dalam 1 card yang sama. `FinCoach.renderDash(ctx)` disederhanakan: dulu render judul+badge+
+  collapse-toggle sendiri per compute, sekarang cuma isi div `finCoachBody` (judul/collapse sudah
+  jadi milik `advisorCard` bersama), & badge jumlah insight dipindah jadi teks di tombol tab
+  ("🩺 Insight Cepat (3)") bukan `<span class="acc-chip">` terpisah spt sebelumnya.
+  `applyOneCardCollapsePref('finCoachCard')` DIHAPUS krn collapse sekarang cuma ada 1x di level
+  `advisorCard`, bukan per-sub-card lagi. `AIWidget` modulnya sendiri **0 baris berubah** — cuma
+  markup pembungkusnya (index.html) yang pindah dari card sendiri jadi panel `advisorPanel-report`.
+
+  `renderDashboard()` (`modules-render.js`) nambah 1 pemanggilan `Advisor.render()` (sinkronkan
+  tab aktif dari localStorage tiap render, krn preferensi bisa disetel dari sesi sebelumnya) — 
+  ditaruh SEBELUM `AIWidget.render()`/`FinCoach.renderDash()` spt urutan lain di fungsi yg sama,
+  aman krn `Advisor` (GROUP_B) dipanggil runtime dari `modules-render.js` (GROUP_A), pola yang
+  sama persis dgn `FinCoach`/`AIWidget` sebelumnya. `build.js` TIDAK berubah (tidak ada file
+  baru/pindah grup, cuma nambah 1 modul kecil di file yang sudah ada + rombak markup 1 card di HTML).
+
+  Dicek: `Advisor`/`AIWidget` masing2 cuma dideklarasi 1x di source & 1x di `app-bundle-b.min.js`
+  (0x di `app-bundle-a.min.js`), `advisorCard` cuma muncul 1x di `index.html`/`app_production.html`,
+  id lama (`finCoachCard`/`aiWidgetCard`) sudah 0x tersisa di kedua HTML (cuma masih ada sesaat di
+  `app_production.html` SEBELUM build ditulis ulang otomatis jadi salinan `index.html` — sudah
+  hilang setelah build selesai), `node --check` lolos di 3 file source yang diubah & kedua bundle,
+  lint bawaan `build.js` (u-dnone vs style.display, field user tanpa escapeHtml) lolos tanpa
+  temuan, `?v=124` konsisten. **Belum**: tidak bisa dites tampilan sungguhan di browser — WAJIB
+  coba manual: buka Dashboard, pastikan card "🧭 Penasihat" muncul 1x (bukan 2 card kayak
+  sebelumnya) dgn 2 tombol tab di atas; tap tab "🔍 Laporan AI" → pastikan pindah ke panel AIWidget
+  (tombol "Buat/Perbarui Analisis" & "Konsultasi AI" masih ada & masih berfungsi spt biasa); tap
+  balik ke "🩺 Insight Cepat" → pastikan insight FinCoach + tombol ✕ dismiss & aksi cepat masih
+  jalan spt sebelum digabung; tutup & buka lagi app → pastikan tab yang terakhir dipilih tetap
+  aktif (persist via localStorage); coba collapse/expand card via chevron → pastikan KEDUA tab
+  ikut collapse bareng (krn sekarang 1 collapse-toggle utk seluruh card, bukan 2 terpisah).
+
+
 
 Kalau mau dilanjutkan, jalan paling aman:
 1. Pilih 1 domain dulu (misal **Cobek**: modul `Etalase`, `Produsen` dari

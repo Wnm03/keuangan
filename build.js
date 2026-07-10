@@ -57,6 +57,7 @@ const GROUP_A = [
   'modals.js',
   'modules-calc.js',
   'cobek.js',
+  'kasir.js',
   'piutang-utang.js',
   'pajak-pbb-zakat.js',
   'features-budget-laporan-carnotes-pelanggan.js',
