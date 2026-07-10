@@ -271,6 +271,249 @@ function lintDnoneStyleDisplayMismatch() {
   return problems;
 }
 
+// 4c. Lint: cegah regresi bug "field user di-render tanpa escapeHtml()"
+// Kronologi: pernah ketemu (lewat audit manual) beberapa `${xxx.nama}` /
+// `${xxx.catatan}` dkk yang dirender langsung ke innerHTML tanpa
+// escapeHtml(), jadi celah HTML/script injection kalau isinya diisi user
+// (nama pelanggan, catatan transaksi, dst bisa berisi karakter `<`/`>`).
+// Lint ini otomatis mengulang cara pengecekan manual tsb tiap build:
+//   1. Cari semua interpolasi `${...}` di source (bukan bundle) yang
+//      isinya CUMA akses properti polos, misal `${s.nama}`, `${it.note}`,
+//      `${a.items[0].name}` — bukan pemanggilan fungsi (jadi `${escapeHtml(x)}`
+//      atau `${fmtFull(x)}` otomatis lolos, karena bukan properti polos).
+//   2. Properti terakhirnya dicek ke daftar FIELD_NAMES_USER di bawah —
+//      nama-nama field yang di app ini historisnya dipakai buat nampung
+//      teks bebas ketikan user (nama pelanggan, catatan, alamat, dst).
+//   3. Kalau ${...} itu ada di dalam template literal yang mengandung tag
+//      HTML (ada pola `<namatag ...>`), berarti kemungkinan besar hasilnya
+//      dipakai lewat innerHTML — jadi wajib diescape. Interpolasi yang
+//      cuma dipakai buat teks biasa (mis. pesan toast(), bukan innerHTML)
+//      TIDAK mengandung tag HTML, jadi otomatis tidak kena lint ini.
+//   4. Kalau baris yang sama sudah ditandai manual `// lint-ok-no-escape:
+//      <alasan>` (dicek & dipastikan memang bukan data user, misal label
+//      status/enum yang fix dari kode, bukan input user), lint ini skip —
+//      supaya false-positive yang sudah diverifikasi tidak menghalangi
+//      build terus-menerus. TAPI penanda ini harus ditulis manual oleh
+//      manusia yang sudah mengecek, bukan ditambah otomatis oleh build.
+// Catatan: FIELD_NAMES_USER bukan daftar lengkap selamanya — kalau nanti
+// ada field baru yang menampung teks ketikan user (misal fitur baru
+// "merkKendaraan" atau "alasanRefund"), TAMBAHKAN nama field itu ke daftar
+// di bawah supaya ikut terlindungi lint ini.
+const FIELD_NAMES_USER = new Set([
+  'nama', 'catatan', 'keterangan', 'deskripsi', 'alamat', 'pesan', 'komentar',
+  'judul', 'memo', 'alasan', 'tujuan', 'merk', 'plat', 'notes', 'note',
+  'name', 'desc', 'sumber', 'penyewa', 'phone', 'email', 'kota', 'city',
+  'address', 'pelanggan', 'customer', 'supplier', 'vendor', 'produsen',
+]);
+const SUPPRESS_MARKER = 'lint-ok-no-escape';
+
+// Cari semua `${...}` di source (brace-aware, karena isinya bisa mengandung
+// kurung kurawal nested, mis. ternary `${a?b:c}`).
+function findTemplateInterpolations(content) {
+  const results = [];
+  const re = /\$\{/g;
+  let m;
+  while ((m = re.exec(content))) {
+    const start = m.index + 2;
+    let depth = 1;
+    let i = start;
+    while (i < content.length && depth > 0) {
+      if (content[i] === '{') depth++;
+      else if (content[i] === '}') depth--;
+      i++;
+    }
+    results.push({ atPos: m.index, endPos: i, inner: content.slice(start, i - 1) });
+  }
+  return results;
+}
+
+// Cari template literal (di antara backtick) yang membungkus posisi tsb,
+// buat cek apakah literal itu mengandung tag HTML (indikasi dipakai lewat
+// innerHTML) — heuristik, bukan parser JS penuh, tapi cukup buat lint ini.
+function enclosingTemplateLiteral(content, pos) {
+  const bstart = content.lastIndexOf('`', pos);
+  if (bstart === -1) return null;
+  const bend = content.indexOf('`', pos);
+  if (bend === -1) return null;
+  return content.slice(bstart, bend);
+}
+
+const BARE_MEMBER_RE = /^[A-Za-z_$][\w$]*(?:\??\.[A-Za-z_$][\w$]*|\[\d+\])*$/;
+const HTML_TAG_RE = /<[a-zA-Z][a-zA-Z0-9-]*[\s>/]/;
+
+// --- Bagian tambahan: lint yang sama tapi buat pola CONCATENATION -----------
+// (`el.innerHTML = 'Halo ' + x.nama`), bukan cuma template literal `${...}`.
+// Kronologi: lint di atas (findTemplateInterpolations) cuma nangkep pola
+// `${obj.field}` di dalam template literal — kalau kode ditulis pakai
+// concatenation string biasa (operator `+`) yang dirender ke innerHTML/
+// outerHTML/insertAdjacentHTML/document.write, field user di situ LOLOS dari
+// lint di atas walau celahnya sama persis (HTML/script injection).
+// Cara kerja (heuristik brace/quote-aware, bukan parser JS penuh):
+//   1. Cari semua sink HTML yang dikenal: `x.innerHTML=`, `x.innerHTML+=`,
+//      `x.outerHTML=`/`+=`, `x.insertAdjacentHTML(pos, ...)`, dan
+//      `document.write(...)`/`document.writeln(...)`.
+//   2. Dari posisi sink itu, scan ekspresi di sisi kanan (atau argumen HTML-
+//      nya utk insertAdjacentHTML) sambil melacak kedalaman kurung/kurawal/
+//      kurung-siku & state di dalam string/template literal, supaya operator
+//      `+` yang levelnya "top-level" (bukan di dalam nested call/array/object)
+//      bisa dipisah jadi operand-operand.
+//   3. Tiap operand dicek: kalau berupa member-expression polos (`x.nama`,
+//      bukan `escapeHtml(x.nama)` — pemanggilan fungsi otomatis lolos karena
+//      bentuknya bukan lagi member-expression polos) DAN nama field
+//      terakhirnya ada di FIELD_NAMES_USER yang sama dgn lint di atas →
+//      dianggap pelanggaran.
+//   4. Suppress manual `// lint-ok-no-escape: <alasan>` di baris yang sama
+//      tetap berlaku, sama seperti lint template-literal.
+// Batasan (heuristik, bukan parser penuh): kalau HTML dirakit dulu ke variabel
+// perantara lalu BARU di-assign ke innerHTML beberapa baris kemudian (mis.
+// `let html=...; el.innerHTML=html;`), lint ini tidak menelusuri sampai ke
+// assignment `html=...`-nya — cuma sink innerHTML/outerHTML/insertAdjacentHTML/
+// document.write yang di-scan langsung ekspresi kanannya.
+
+// Scan dari `startPos` mengikuti kedalaman kurung ()/[]/{} & state string
+// ('/"/`), berhenti begitu ketemu `;` atau `,` di level TOP (depth 0), atau
+// ketemu penutup kurung yang levelnya "keluar" dari scope pemanggil (depth
+// jadi negatif). Selagi jalan, catat posisi absolut tiap operator `+` yang
+// levelnya top-level (bukan `++`, bukan di dalam string/nested bracket).
+function scanConcatExpr(content, startPos) {
+  let i = startPos;
+  let depth = 0;
+  let quote = null;
+  const plusPositions = [];
+  while (i < content.length) {
+    const c = content[i];
+    if (quote) {
+      if (c === '\\') { i += 2; continue; }
+      if (c === quote) quote = null;
+      i++;
+      continue;
+    }
+    if (c === "'" || c === '"' || c === '`') { quote = c; i++; continue; }
+    if (c === '(' || c === '[' || c === '{') { depth++; i++; continue; }
+    if (c === ')' || c === ']' || c === '}') {
+      if (depth === 0) break; // keluar dari scope pemanggil (mis. tutup kurung sink)
+      depth--; i++; continue;
+    }
+    if (depth === 0 && (c === ';' || c === ',')) break;
+    if (depth === 0 && c === '+' && content[i - 1] !== '+' && content[i + 1] !== '+' && content[i + 1] !== '=') {
+      plusPositions.push(i);
+    }
+    i++;
+  }
+  return { endPos: i, plusPositions };
+}
+
+// Ambil daftar argumen (posisi start/end) dari sebuah pemanggilan fungsi,
+// dimulai TEPAT SETELAH tanda kurung buka `(`.
+function scanCallArgs(content, afterOpenParen) {
+  const args = [];
+  let pos = afterOpenParen;
+  while (pos <= content.length) {
+    const { endPos, plusPositions } = scanConcatExpr(content, pos);
+    args.push({ start: pos, end: endPos, plusPositions });
+    if (content[endPos] === ',') { pos = endPos + 1; continue; }
+    break;
+  }
+  return args;
+}
+
+// Sink HTML yang dikenal lint ini. `kind:'assign'` -> scan ekspresi setelah
+// operator `=`/`+=`. `kind:'call'` -> scan argumen ke-`argIndex` dari
+// pemanggilan fungsi (0-based).
+const HTML_SINK_PATTERNS = [
+  { re: /\.innerHTML\s*(\+=|=(?!=))\s*/g, kind: 'assign' },
+  { re: /\.outerHTML\s*(\+=|=(?!=))\s*/g, kind: 'assign' },
+  { re: /\.insertAdjacentHTML\s*\(/g, kind: 'call', argIndex: 1 },
+  { re: /document\.write(?:ln)?\s*\(/g, kind: 'call', argIndex: null }, // null = cek semua argumen
+];
+
+function findConcatOperands(content) {
+  // {start,end} tiap operand yg perlu dicek, dikumpulkan dari semua sink.
+  const operands = [];
+  for (const sink of HTML_SINK_PATTERNS) {
+    sink.re.lastIndex = 0;
+    let m;
+    while ((m = sink.re.exec(content))) {
+      if (sink.kind === 'assign') {
+        const start = m.index + m[0].length;
+        const { endPos, plusPositions } = scanConcatExpr(content, start);
+        const bounds = [start, ...plusPositions, endPos];
+        for (let k = 0; k < bounds.length - 1; k++) {
+          const opStart = k === 0 ? bounds[0] : bounds[k] + 1;
+          operands.push({ start: opStart, end: bounds[k + 1] });
+        }
+      } else {
+        const args = scanCallArgs(content, m.index + m[0].length);
+        const targetArgs = sink.argIndex === null ? args : (args[sink.argIndex] ? [args[sink.argIndex]] : []);
+        for (const arg of targetArgs) {
+          const bounds = [arg.start, ...arg.plusPositions, arg.end];
+          for (let k = 0; k < bounds.length - 1; k++) {
+            const opStart = k === 0 ? bounds[0] : bounds[k] + 1;
+            operands.push({ start: opStart, end: bounds[k + 1] });
+          }
+        }
+      }
+    }
+  }
+  return operands;
+}
+
+function lintUnescapedUserFieldConcat() {
+  const problems = [];
+  for (const f of ALL_SOURCE) {
+    const content = readFile(f);
+    const lines = content.split('\n');
+    for (const { start, end } of findConcatOperands(content)) {
+      const inner = content.slice(start, end).trim();
+      if (!BARE_MEMBER_RE.test(inner)) continue;
+      const segs = inner.split(/\.|\[/).map((s) => s.replace(/\]$/, '').replace(/\?$/, ''));
+      const lastField = segs[segs.length - 1];
+      if (!FIELD_NAMES_USER.has(lastField)) continue;
+
+      const lineNo = content.slice(0, start).split('\n').length;
+      if (lines[lineNo - 1] && lines[lineNo - 1].includes(SUPPRESS_MARKER)) continue;
+
+      problems.push(`${f}:${lineNo} — + ${inner} — field "${lastField}" terlihat seperti data ketikan user, dirender ke innerHTML/outerHTML/insertAdjacentHTML/document.write lewat concatenation ("+"), bukan escapeHtml()`);
+    }
+  }
+  return problems;
+}
+
+function lintUnescapedUserField() {
+  const problems = [];
+  for (const f of ALL_SOURCE) {
+    const content = readFile(f);
+    const lines = content.split('\n');
+    for (const occ of findTemplateInterpolations(content)) {
+      const inner = occ.inner.trim();
+      // Hanya tertarik ke interpolasi properti polos (bukan pemanggilan
+      // fungsi) — kalau sudah dibungkus escapeHtml(...)/fmtFull(...)/dst,
+      // bentuknya bukan lagi member-expression polos, jadi otomatis lolos.
+      if (!BARE_MEMBER_RE.test(inner)) continue;
+      const segs = inner.split(/\.|\[/).map((s) => s.replace(/\]$/, '').replace(/\?$/, ''));
+      const lastField = segs[segs.length - 1];
+      if (!FIELD_NAMES_USER.has(lastField)) continue;
+
+      const tmpl = enclosingTemplateLiteral(content, occ.atPos);
+      if (!tmpl || !HTML_TAG_RE.test(tmpl)) continue; // bukan innerHTML-shaped literal
+
+      const lineNo = content.slice(0, occ.atPos).split('\n').length;
+      // Penanda suppress tidak bisa ditaruh SATU baris dgn interpolasi kalau baris
+      // itu ada di DALAM template literal (`//` akan ikut jadi bagian string, bukan
+      // komentar beneran). Jadi selain baris interpolasi itu sendiri (utk kasus
+      // literal satu baris), izinkan juga penanda ditaruh persis di baris SEBELUM
+      // template literal itu mulai (baris `const x=\`...` di-comment di atasnya).
+      const tmplStartPos = content.lastIndexOf('`', occ.atPos);
+      const tmplStartLine = content.slice(0, tmplStartPos).split('\n').length;
+      const suppressLines = [lineNo, tmplStartLine - 1];
+      if (suppressLines.some((ln) => lines[ln - 1] && lines[ln - 1].includes(SUPPRESS_MARKER))) continue;
+
+      problems.push(`${f}:${lineNo} — \${${inner}} — field "${lastField}" terlihat seperti data ketikan user, dirender di dalam markup HTML tanpa escapeHtml()`);
+    }
+  }
+  return problems;
+}
+
 // 4. Naikkan ?v=N & CACHE_NAME lewat bump-version.sh yang sudah ada
 function bumpCacheVersion() {
   const out = execSync('bash bump-version.sh', { cwd: ROOT }).toString();
@@ -301,6 +544,22 @@ function main() {
     process.exit(1);
   }
   console.log('✓ Tidak ada elemen u-dnone yang berisiko permanen kosong\n');
+
+  console.log('Mengecek pola bug "field user dirender tanpa escapeHtml()"...');
+  const escapeProblems = lintUnescapedUserField().concat(lintUnescapedUserFieldConcat());
+  if (escapeProblems.length) {
+    console.error(`\n❌ BUILD DIHENTIKAN — ditemukan ${escapeProblems.length} interpolasi/concatenation field user yang berpotensi celah HTML/script injection:\n`);
+    escapeProblems.forEach((p) => console.error('  - ' + p));
+    console.error(
+      '\nPerbaiki dengan membungkus pakai escapeHtml(...), misal ${escapeHtml(x.nama)} atau ' +
+      "'...'+escapeHtml(x.nama)+'...'.\n" +
+      'Kalau setelah dicek field itu TERNYATA bukan data ketikan user (misal label status/enum ' +
+      'tetap dari kode), tandai baris itu dgn komentar `// lint-ok-no-escape: <alasan>` supaya ' +
+      'lint ini tidak menghalangi build lagi untuk baris tsb.'
+    );
+    process.exit(1);
+  }
+  console.log('✓ Tidak ada field user yang dirender tanpa escapeHtml() (template literal maupun concatenation)\n');
 
   const explicitVersion = process.argv[2];
   const oldVersion = detectCurrentVersion();

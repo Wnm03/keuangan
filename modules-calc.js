@@ -1,5 +1,5 @@
 
-const MODULE_CALC_VERSION='kw70-a11y-cat-toggle-arialabel';
+const MODULE_CALC_VERSION='kw70-tukang-riwayat-absensi-11';
 const FI={
 assetScopeState:'zakatable',
 investmentAssetValue(){

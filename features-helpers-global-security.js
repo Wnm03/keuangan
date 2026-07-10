@@ -15,8 +15,21 @@ catch(e){ console.error(`Migrasi data ke versi ${m.toVersion} ("${m.desc}") gaga
 });
 D.schemaVersion=SCHEMA_VERSION;
 }
-const APP_BUILD_VERSION = 'kw70-a11y-cat-toggle-arialabel';
-const PRODUCTION_BUILD_SYNCED_VERSION = 'kw70-a11y-cat-toggle-arialabel';
+// isDevMode() — satu sumber kebenaran untuk deteksi mode developer, dipakai di seluruh app
+// (Diagnostik di Pengaturan, smoke-test.js, dll). Aktif kalau: ?dev=1 di URL, localStorage
+// kw_dev='1', dibuka lewat file:// langsung, atau di localhost/127.0.0.1 (server dev lokal).
+// Sengaja DISAMAKAN dengan logika isDevMode() di smoke-test.js supaya konsisten satu app.
+function isDevMode(){
+try{
+if(new URLSearchParams(location.search).get('dev')==='1')return true;
+if(localStorage.getItem('kw_dev')==='1')return true;
+if(location.protocol==='file:')return true;
+if(location.hostname==='localhost'||location.hostname==='127.0.0.1')return true;
+}catch(e){ /* anggap bukan dev mode kalau gagal deteksi */ }
+return false;
+}
+const APP_BUILD_VERSION = 'kw70-tukang-riwayat-absensi-11';
+const PRODUCTION_BUILD_SYNCED_VERSION = 'kw70-tukang-riwayat-absensi-11';
 let D = {
 schemaVersion:SCHEMA_VERSION,
 transactions:[],cobek:[],products:[],produsen:[],cobekKategori:JSON.parse(JSON.stringify(DEFAULT_COBEK_KATEGORI)),targets:[],eduFunds:[],reminders:[],bills:[],billsArchive:[],

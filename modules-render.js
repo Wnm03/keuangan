@@ -1,7 +1,7 @@
 // Fungsi render (85 fungsi) dipisah dari app_production.html untuk pemerataan ukuran file.
 // Semua fungsi ini murni definisi function global (bukan module), jadi tetap bisa dipanggil dari file manapun
 // yang loadnya belakangan (sama seperti modules-calc.js/features-*.js).
-const MODULE_RENDER_VERSION='kw70-a11y-cat-toggle-arialabel';
+const MODULE_RENDER_VERSION='kw70-tukang-riwayat-absensi-11';
 
 function renderPageContent(name){
 if(name==='dashboard')renderDashboard();
@@ -144,7 +144,7 @@ html+=`<div class="cat-group">
           <button class="tx-del" data-action="openSubCatModal" data-args="${escapeHtml(JSON.stringify([c.id, type]))}" title="Tambah subkategori" aria-label="Tambah subkategori">➕</button>
           <button class="tx-del" data-action="delCat" data-args="${escapeHtml(JSON.stringify([c.id, type]))}" aria-label="Hapus">🗑</button>
         </div>
-        ${hasSubs?`<div class="cat-sub-list" id="subs_${c.id}">${c.subs.map(s=>`<div class="cat-sub-item"><span class="u-fs12 u-ctext3">↳</span><div class="cat-sub-name u-pointer" data-action="openSubCatModal" data-args="${escapeHtml(JSON.stringify([c.id, type, s.id]))}" title="Edit subkategori">${s.name}</div><button class="tx-del" data-action="delSubCat" data-args="${escapeHtml(JSON.stringify([c.id, type, s.id]))}" aria-label="Hapus">🗑</button></div>`).join('')}</div>`:''}
+        ${hasSubs?`<div class="cat-sub-list" id="subs_${c.id}">${c.subs.map(s=>`<div class="cat-sub-item"><span class="u-fs12 u-ctext3">↳</span><div class="cat-sub-name u-pointer" data-action="openSubCatModal" data-args="${escapeHtml(JSON.stringify([c.id, type, s.id]))}" title="Edit subkategori" aria-label="Edit subkategori ${escapeHtml(s.name)}">${escapeHtml(s.name)}</div><button class="tx-del" data-action="delSubCat" data-args="${escapeHtml(JSON.stringify([c.id, type, s.id]))}" aria-label="Hapus">🗑</button></div>`).join('')}</div>`:''}
       </div>`;
 });
 });
@@ -161,7 +161,7 @@ const listEl=document.getElementById('billHistoryList');
 if(!listEl)return;
 const rows=D.transactions.filter(t=>t.billLinkId===curBillHistoryId).sort((a,b2)=>new Date(b2.date)-new Date(a.date));
 const lunasTag=D.bills.find(x=>x.id===curBillHistoryId)?'':' · ✅ Lunas';
-if(subEl)subEl.textContent=b?`${escapeHtml(b.name)} · ${rows.length}x pembayaran tercatat${lunasTag}`:`${rows.length}x pembayaran tercatat`;
+if(subEl)subEl.textContent=b?`${b.name} · ${rows.length}x pembayaran tercatat${lunasTag}`:`${rows.length}x pembayaran tercatat`;
 if(!rows.length){
 listEl.innerHTML='<div class="empty"><div class="empty-icon">📋</div><div class="empty-text">Belum ada riwayat pembayaran</div></div>';
 return;
@@ -1048,6 +1048,8 @@ wrap.innerHTML=`<div class="card-title u-mb6">🗄️ Riwayat Arsip</div>${rows}
 }
 
 function renderSettings(){
+const diagGroupEl=document.getElementById('stgGroup6');
+if(diagGroupEl) diagGroupEl.style.display=isDevMode()?'':'none';
 renderStorageUsage();
 updateDebugConsoleBtn();
 const abvEl=document.getElementById('aboutBuildVersion'); if(abvEl) abvEl.textContent=APP_BUILD_VERSION;
@@ -1179,8 +1181,10 @@ renderSelfTestResults(stored);
 }
 
 function renderNavSmokeResults(data){
+_lastNavSmokeData=data;
 const summaryEl=document.getElementById('navSmokeSummary');
 const resultsEl=document.getElementById('navSmokeResults');
+const copyBtn=document.getElementById('navSmokeCopyBtn');
 if(summaryEl) summaryEl.innerHTML=(data.failCount===0?'✅ ':'⚠️ ')+'<b>'+data.passCount+'/'+data.total+'</b> halaman aman'+(data.failCount>0?' · <span class="u-cacc2">'+data.failCount+' bermasalah</span>':'')+'<div class="u-ctext3 u-mt2">Terakhir dijalankan: '+new Date(data.ranAt).toLocaleString('id-ID')+'</div>';
 if(resultsEl){
 resultsEl.innerHTML=data.results.filter(r=>!r.pass).map(r=>`
@@ -1192,11 +1196,14 @@ resultsEl.innerHTML=data.results.filter(r=>!r.pass).map(r=>`
         </div>
       </div>`).join('');
 }
+if(copyBtn) copyBtn.style.display=data.results.length?'block':'none';
 }
 
 function renderModalSweepResults(data){
+_lastModalSweepData=data;
 const summaryEl=document.getElementById('modalSweepSummary');
 const resultsEl=document.getElementById('modalSweepResults');
+const copyBtn=document.getElementById('modalSweepCopyBtn');
 if(summaryEl) summaryEl.innerHTML=(data.failCount===0?'✅ ':'⚠️ ')+'<b>'+data.passCount+'/'+data.total+'</b> modal aman'+(data.contextCount>0?' · <span class="u-ctext3">'+data.contextCount+' butuh konteks (wajar)</span>':'')+(data.failCount>0?' · <span class="u-cacc2">'+data.failCount+' bermasalah</span>':'')+'<div class="u-ctext3 u-mt2">Terakhir dijalankan: '+new Date(data.ranAt).toLocaleString('id-ID')+'</div>';
 if(resultsEl){
 resultsEl.innerHTML=data.results.filter(r=>!r.pass&&!r.needsContext).map(r=>`
@@ -1208,6 +1215,7 @@ resultsEl.innerHTML=data.results.filter(r=>!r.pass&&!r.needsContext).map(r=>`
         </div>
       </div>`).join('');
 }
+if(copyBtn) copyBtn.style.display=data.results.length?'block':'none';
 }
 
 function renderPajakZakat(){

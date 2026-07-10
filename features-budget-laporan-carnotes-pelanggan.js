@@ -2,7 +2,7 @@
 // PENTING: file ini HARUS dimuat sesuai urutan build.js (GROUP_A/GROUP_B) karena beberapa modul saling referensi. Urutan grup ini: pajak-pbb-zakat.js, features-budget-laporan-carnotes-pelanggan.js, edukasi-dana.js, sewakios.js, hidup-seimbang.js, linktx.js, renovasi.js, aset.js, worthit.js
 // CATATAN: MODULE_FEATURES_VERSION, VEHTAX_INPUT_IDS, MY_WRENCH, CHAT_ACTION_LABELS DIPINDAH ke sini dari features-etalase-piutang-renovai.js (file itu dihapus, sisa 3 konstanta kecilnya sudah tidak punya file sendiri lagi — semua ditaruh dekat kode yang benar-benar memakainya di domain ini: VEHTAX_INPUT_IDS dekat VEHTAX_ITEMS, MY_WRENCH dekat modul Torsi, CHAT_ACTION_LABELS dekat CHAT_ACTION_HANDLERS/CHAT_ACTION_EDIT_FIELDS).
 
-const MODULE_FEATURES_VERSION='kw70-a11y-cat-toggle-arialabel';
+const MODULE_FEATURES_VERSION='kw70-tukang-riwayat-absensi-11';
 const Budget={
 editId:null,
 curIcon:'🍚',
@@ -155,9 +155,9 @@ return txt.replace(/^[\s↳]+/,'').replace(/^[^\w\s]+\s*/,'').trim();
 renderCatOptions(selected){
 let html=`<label class="budget-cat-opt total"><input type="checkbox" id="budgetCatTotal" onchange="onBudgetCatTotalToggle(this)"> 🎯 Total Pengeluaran (semua kategori)</label>`;
 D.categories.expense.forEach(c=>{
-html+=`<label class="budget-cat-opt"><input type="checkbox" class="budgetCatChk" value="${c.id}" onchange="onBudgetCatChildToggle()"> ${c.icon||''} ${c.name}</label>`;
+html+=`<label class="budget-cat-opt"><input type="checkbox" class="budgetCatChk" value="${c.id}" onchange="onBudgetCatChildToggle()"> ${escapeHtml(c.icon||'')} ${escapeHtml(c.name)}</label>`;
 (c.subs||[]).forEach(s=>{
-html+=`<label class="budget-cat-opt sub"><input type="checkbox" class="budgetCatChk" value="${s.id}" onchange="onBudgetCatChildToggle()"> ↳ ${s.icon||''} ${s.name}</label>`;
+html+=`<label class="budget-cat-opt sub"><input type="checkbox" class="budgetCatChk" value="${s.id}" onchange="onBudgetCatChildToggle()"> ↳ ${escapeHtml(s.icon||'')} ${escapeHtml(s.name)}</label>`;
 });
 });
 document.getElementById('budgetCatList').innerHTML=html;
@@ -300,7 +300,7 @@ showDrillDown(id){
 const b=D.budgets.find(x=>x.id===id);if(!b)return;
 const txM=D.transactions.filter(t=>Budget.matchesPeriod(b,t,curMonth,curYear)&&Budget.matchesTx(b,t)).sort((a,c)=>new Date(c.date)-new Date(a.date));
 const total=txM.reduce((s,t)=>s+t.amount,0);
-document.getElementById('filterTxTitle').textContent=`${b.icon} ${escapeHtml(b.name)}`;
+document.getElementById('filterTxTitle').textContent=`${b.icon} ${b.name}`;
 document.getElementById('filterTxSummary').textContent=`${txM.length} transaksi · Total ${fmtFull(total)} dari anggaran ${fmtFull(Budget.getEffectiveLimit(b))}`;
 document.getElementById('filterTxList').innerHTML=txM.length?txM.map(txHTML).join(''):'<div class="empty"><div class="empty-icon">✅</div><div class="empty-text">Belum ada pengeluaran di kategori ini</div></div>';
 openModal('filterTxModal');

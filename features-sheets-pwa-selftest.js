@@ -276,6 +276,24 @@ navigator.serviceWorker.register(swUrl).catch(e=>console.warn('SW gagal:',e.mess
 }catch(e){console.warn('Setup PWA gagal:',e);}
 }
 function _selfTestAssert(cond,msg){ if(!cond) throw new Error(msg||'Gagal'); }
+// Cek elemen [data-action] yang cuma berisi ikon/emoji tanpa teks & tanpa aria-label/aria-labelledby --
+// screen reader tidak bisa menjelaskan fungsi tombol semacam ini ke pengguna tunanetra.
+// Diberi parameter `root` (default: seluruh document) supaya bisa dipakai 2 cara:
+//   1. Dipanggil dari test case "Tes Otomatis" biasa (root=document) -- cuma nyisir apa yang
+//      lagi ke-render di layar saat itu (halaman aktif + elemen persisten seperti nav bar).
+//   2. Dipanggil per-halaman dari Tes Navigasi Halaman (root=elemen #page-xxx) setelah tiap
+//      showPage(), supaya SEMUA halaman ikut disisir dalam satu klik, bukan cuma yang lagi aktif.
+function findMissingAriaLabels(root){
+const scope=root||document;
+const problems=[];
+scope.querySelectorAll('[data-action]').forEach(el=>{
+if(el.hasAttribute('aria-label')||el.hasAttribute('aria-labelledby'))return;
+const text=(el.textContent||'').replace(/[^a-zA-Z]/g,'');
+if(text.length>=3)return; // ada teks yang cukup terbaca oleh screen reader
+problems.push('Elemen <'+el.tagName.toLowerCase()+' id="'+(el.id||'-')+'" data-action="'+el.getAttribute('data-action')+'"> cuma berisi ikon/emoji/teks pendek tanpa aria-label -- screen reader tidak akan bisa menjelaskan fungsi tombol ini.');
+});
+return problems;
+}
 function getSelfTestCases(){
 return [
 {name:'fmt() singkat angka jutaan/ribuan dengan benar', fn:()=>{
@@ -1737,12 +1755,7 @@ renderDashboardBackupReminder();
 }
 }},
 {name:'UI: elemen interaktif (data-action) yang cuma berisi ikon/emoji/tanpa teks wajib punya aria-label (aksesibilitas screen reader)', fn:()=>{
-document.querySelectorAll('[data-action]').forEach(el=>{
-if(el.hasAttribute('aria-label')||el.hasAttribute('aria-labelledby'))return;
-const text=(el.textContent||'').replace(/[^a-zA-Z]/g,'');
-if(text.length>=3)return; // ada teks yang cukup terbaca oleh screen reader
-_selfTestAssert(false,'Elemen <'+el.tagName.toLowerCase()+' id="'+(el.id||'-')+'" data-action="'+el.getAttribute('data-action')+'"> cuma berisi ikon/emoji/teks pendek tanpa aria-label -- screen reader tidak akan bisa menjelaskan fungsi tombol ini.');
-});
+findMissingAriaLabels(document).forEach(msg=>_selfTestAssert(false,msg));
 }},
 ];
 }
@@ -1757,6 +1770,8 @@ const passCount=results.filter(r=>r.pass).length;
 return {results,passCount,total:results.length,failCount:results.length-passCount,ranAt:new Date().toISOString()};
 }
 let _lastSelfTestData=null;
+let _lastNavSmokeData=null;
+let _lastModalSweepData=null;
 /* moved to modules-render.js: renderSelfTestResults */
 /* moved to modules-render.js: renderSelfTestLastResult */
 function saveSelfTestState(data){
@@ -1805,7 +1820,27 @@ toast('📋 Hasil tes disalin');
 toast('⚠️ Gagal menyalin, coba lagi');
 }
 }
-const NAV_SMOKE_PAGES=['dashboard','keuangan','cobek','carnotes','ai','pajak','settings'];
+// Derive daftar halaman langsung dari DOM (.page[id^="page-"]), bukan list statis --
+// pola yg sama dgn computeModalSweepFnNames() (nyari otomatis semua fungsi openXModal).
+// Kalau nanti nambah <div class="page" id="page-xxx">, halaman itu otomatis ikut kesisir
+// tanpa perlu ingat update list manual di sini.
+function computeNavSmokePageNames(){
+const names=[];
+document.querySelectorAll('.page[id^="page-"]').forEach(el=>{
+names.push(el.id.replace(/^page-/,''));
+});
+return names;
+}
+// Tes Navigasi Halaman: pindah ke tiap halaman satu-satu (showPage), sekaligus jalankan cek
+// aria-label (findMissingAriaLabels) di halaman yg baru saja dirender. Kenapa digabung di sini:
+// cek aria-label yg berdiri sendiri di "Tes Otomatis" cuma nyisir elemen yg KEBETULAN lagi
+// ke-render di layar saat tombol itu ditekan (biasanya cuma 1 halaman) -- halaman lain yg
+// belum pernah dikunjungi sejak app dibuka isinya masih kosong (renderPageContent belum
+// dipanggil), jadi elemen [data-action] di dalamnya tidak ikut kesisir & pelanggaran aria-label
+// di sana bisa lolos tanpa ketahuan. Dengan memasang cek ini di tiap iterasi showPage() di
+// bawah, satu klik "Tes Navigasi Halaman" otomatis menyisir aria-label di SEMUA halaman yg
+// ADA DI DOM (computeNavSmokePageNames()), bukan cuma halaman yg lagi aktif -- dan otomatis
+// ikut halaman baru tanpa perlu update list manual.
 async function computeNavSmokeTestResults(){
 const originalActive=document.querySelector('.page.active');
 const originalName=originalActive?originalActive.id.replace('page-',''):'dashboard';
@@ -1815,13 +1850,21 @@ const results=[];
 let caughtErr=null;
 const onErr=(e)=>{ caughtErr=(e&&e.error&&e.error.message)||(e&&e.message)||String(e); };
 window.addEventListener('error',onErr);
-for(const name of NAV_SMOKE_PAGES){
+const pageNames=computeNavSmokePageNames();
+for(const name of pageNames){
 caughtErr=null;
 let pass=true,error=null;
 try{
 showPage(name);
 await new Promise(r=>setTimeout(r,30));
 if(caughtErr){ pass=false; error=caughtErr; }
+const pageEl=document.getElementById('page-'+name);
+const a11yIssues=findMissingAriaLabels(pageEl||document);
+if(a11yIssues.length){
+pass=false;
+const a11yMsg='🔍 Aksesibilitas: '+a11yIssues.length+' elemen tanpa aria-label -- '+a11yIssues[0]+(a11yIssues.length>1?' (+'+(a11yIssues.length-1)+' pelanggaran lain di halaman ini)':'');
+error=error?error+' | '+a11yMsg:a11yMsg;
+}
 }catch(e){ pass=false; error=e.message; }
 results.push({name,pass,error});
 }
@@ -1835,7 +1878,36 @@ return {results,passCount,total:results.length,failCount:results.length-passCoun
 async function runNavSmokeTest(){
 const data=await computeNavSmokeTestResults();
 renderNavSmokeResults(data);
-toast(data.failCount===0?'✅ Navigasi semua halaman aman ('+data.passCount+'/'+data.total+')':'⚠️ '+data.failCount+' halaman bermasalah, cek daftar di bawah');
+toast(data.failCount===0?'✅ Navigasi & aksesibilitas semua halaman aman ('+data.passCount+'/'+data.total+')':'⚠️ '+data.failCount+' halaman bermasalah (error JS dan/atau aria-label), cek daftar di bawah');
+}
+// Sama seperti copySelfTestResults() -- disalin ke clipboard buat ditempel ke
+// WA/laporan ke diri sendiri pas lagi debug. `error` di tiap hasil sudah berupa
+// gabungan (error JS dan/atau pelanggaran aria-label, dipisah " | " kalau dua-duanya
+// ada -- lihat computeNavSmokeTestResults), jadi otomatis ikut tersalin apa adanya.
+async function copyNavSmokeResults(){
+if(!_lastNavSmokeData){toast('⚠️ Jalankan tes navigasi dulu sebelum menyalin hasil');return;}
+const d=_lastNavSmokeData;
+const lines=[
+'Hasil Tes Navigasi & Aksesibilitas — Keluarga W',
+new Date(d.ranAt).toLocaleString('id-ID'),
+d.passCount+'/'+d.total+' halaman aman'+(d.failCount>0?', '+d.failCount+' bermasalah':''),
+'',
+...d.results.map(r=>(r.pass?'✅ ':'❌ ')+r.name+(r.pass?'':'\n   → '+r.error))
+];
+const text=lines.join('\n');
+try{
+if(navigator.clipboard&&navigator.clipboard.writeText){
+await navigator.clipboard.writeText(text);
+} else {
+const ta=document.createElement('textarea');
+ta.value=text; ta.style.position='fixed'; ta.style.opacity='0';
+document.body.appendChild(ta); ta.select();
+document.execCommand('copy'); document.body.removeChild(ta);
+}
+toast('📋 Hasil tes navigasi disalin');
+}catch(e){
+toast('⚠️ Gagal menyalin, coba lagi');
+}
 }
 function computeModalSweepFnNames(){
 const names=[];
@@ -2071,6 +2143,33 @@ data.results.push({fn:'(kelengkapan cakupan) modal belum terdaftar',id:covData.u
 }
 renderModalSweepResults(data);
 toast(data.failCount===0?'✅ Semua modal aman ('+data.passCount+'/'+data.total+', '+data.contextCount+' butuh konteks)':'⚠️ '+data.failCount+' modal bermasalah, cek daftar di bawah');
+}
+// Sama seperti copySelfTestResults()/copyNavSmokeResults() -- disalin ke clipboard
+// buat ditempel ke WA/laporan ke diri sendiri pas lagi debug modal.
+async function copyModalSweepResults(){
+if(!_lastModalSweepData){toast('⚠️ Jalankan tes modal dulu sebelum menyalin hasil');return;}
+const d=_lastModalSweepData;
+const lines=[
+'Hasil Tes Buka/Tutup Modal — Keluarga W',
+new Date(d.ranAt).toLocaleString('id-ID'),
+d.passCount+'/'+d.total+' modal aman'+(d.contextCount>0?', '+d.contextCount+' butuh konteks':'')+(d.failCount>0?', '+d.failCount+' bermasalah':''),
+'',
+...d.results.map(r=>(r.pass?(r.needsContext?'ℹ️ ':'✅ '):'❌ ')+r.fn+' (#'+r.id+')'+(r.pass?'':'\n   → '+r.error))
+];
+const text=lines.join('\n');
+try{
+if(navigator.clipboard&&navigator.clipboard.writeText){
+await navigator.clipboard.writeText(text);
+} else {
+const ta=document.createElement('textarea');
+ta.value=text; ta.style.position='fixed'; ta.style.opacity='0';
+document.body.appendChild(ta); ta.select();
+document.execCommand('copy'); document.body.removeChild(ta);
+}
+toast('📋 Hasil tes modal disalin');
+}catch(e){
+toast('⚠️ Gagal menyalin, coba lagi');
+}
 }
 async function autoRunSelfTestIfNeeded(){
 try{

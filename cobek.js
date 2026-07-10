@@ -201,6 +201,7 @@ const provider=D.profile.apiProvider||'claude';
 if(!apiKey){toast('⚠️ Belum ada API Key. Isi dulu di Pengaturan → AI Asisten.');return;}
 const info=document.getElementById('prkMarketInfo');
 if(info)info.textContent='🔍 Mencari kisaran harga pasar via web search... (bisa 10-30 detik)';
+// lint-ok-no-escape: sysPrompt ini teks prompt yang dikirim ke API AI (bukan di-render ke innerHTML), jadi tidak butuh escapeHtml(); "<angka ...>" di isi prompt cuma notasi placeholder JSON, bukan tag HTML sungguhan
 const sysPrompt=`Kamu asisten riset harga pasar Indonesia. Cari kisaran HARGA JUAL ECERAN wajar (bukan harga grosir/pabrik) utk produk berikut lewat web search: "${name}". Balas HANYA JSON valid (tanpa teks lain, tanpa markdown fence):
 {"hargaPasar":{"min": <angka Rp, atau null kalau tidak ketemu>, "max": <angka Rp, atau null>, "source":"<sumber & rincian singkat>"}}
 Kalau tidak ketemu/tidak yakin, isi min & max dengan null dan jelaskan di source. JANGAN mengarang angka.`;
@@ -642,7 +643,8 @@ const consistent=new Set(prices.map(p=>p.harga)).size===1;
 return `<div class="u-mb8"><div class="u-fs12 u-fw700 u-mb4">${escapeHtml(name)} ${consistent?'<span class="u-cacc3 u-fs12">✓ harga konsisten</span>':'<span class="u-cacc4 u-fs12">⚠ harga berubah</span>'}</div>${rows}</div>`;
 }).join('');
 const orderListHTML=orders.map(o=>cobekOrderRowHTML(o)).join('');
-const waBtn=c.phone?`<button class="wa-btn" data-action="openWaShare" data-args="${escapeHtml(JSON.stringify(['Halo ${escapeHtml(c.name)}, terima kasih sudah jadi pelanggan Shop kami ya! 🪨🙏', escapeHtml(c.phone)]))}">💬 Chat WhatsApp</button>`:'';
+const waMsg=`Halo ${c.name}, terima kasih sudah jadi pelanggan Shop kami ya! 🪨🙏`;
+const waBtn=c.phone?`<button class="wa-btn" data-action="openWaShare" data-args="${escapeHtml(JSON.stringify([waMsg, c.phone]))}">💬 Chat WhatsApp</button>`:'';
 const body=document.getElementById('customerDetailBody');
 document.getElementById('customerDetailTitle').textContent=c.name+(c.orders.length>=3?' 🌟':'');
 body.innerHTML=`

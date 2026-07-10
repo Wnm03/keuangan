@@ -74,6 +74,7 @@ ring.style.strokeDashoffset=Math.round(circumference*(1-total/100));
 document.getElementById('lbBars').innerHTML=parts.map(p=>{
 const pct=Math.round((p.pts/p.max)*100);
 const barColor=pct>=80?'var(--accent3)':pct>=50?'var(--accent4)':'var(--accent2)';
+// lint-ok-no-escape: p.label & p.note di sini selalu string tetap dari LifeBalance.compute() (mis. ddNote/dsrNote/nsdNote/workNote) yang ditulis di kode, bukan teks ketikan user
 return `<div>
         <div class="u-flex u-jcb u-fs11" style="margin-bottom:3px"><span>${p.label}</span><span class="u-t2">${p.note}</span></div>
         <div class="budget-bar-track" style="height:6px"><div class="budget-bar-fill" style="width:${pct}%;background:${barColor}"></div></div>

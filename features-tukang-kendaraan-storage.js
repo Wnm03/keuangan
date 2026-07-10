@@ -9,6 +9,44 @@ _rangeResult:null,
 _dayCtx:null,
 _pendingPaymentEntryIds:null,
 _pendingPaymentRange:null,
+_histOpen:{},
+toggleWorkerHistory(workerId){
+Tukang._histOpen[workerId]=!Tukang._histOpen[workerId];
+Tukang.renderAll();
+},
+async delAbsensiEntry(id){
+const a=D.tukangAbsensi.find(x=>sameId(x.id,id));
+if(!a)return;
+if(a.paidTxId){toast('⚠️ Absensi ini sudah dibayar (tercatat di Keuangan), tidak bisa dihapus di sini');return;}
+if(a.renovItemLinkId){toast('⚠️ Absensi ini sudah dipakai di item Renovasi, tidak bisa dihapus di sini');return;}
+if(!await askConfirm('Hapus catatan absensi ini?'))return;
+D.tukangAbsensi=D.tukangAbsensi.filter(x=>!sameId(x.id,id));
+save();Tukang.renderAll();toast('🗑 Absensi dihapus');
+},
+renderWorkerHistory(w){
+const entries=D.tukangAbsensi.filter(a=>a.workerId==w.id).sort((a,b)=>a.date<b.date?1:(a.date>b.date?-1:0));
+const isOpen=!!Tukang._histOpen[w.id];
+const listHtml=entries.length?entries.map(a=>{
+const locked=!!(a.renovItemLinkId||a.paidTxId);
+const paidLock=!!a.paidTxId;
+const dateLabel=new Date(a.date+'T00:00:00').toLocaleDateString('id-ID',{weekday:'short',day:'numeric',month:'short'});
+const detail=a.mode==='borongan'?`📦 Borongan ${fmtFull(a.borTotal)}÷${a.borJumlah} tukang`:`⏰ ${a.masuk}–${a.pulang} (${a.jamKerja} jam${a.jamLembur>0?', lembur '+a.jamLembur+' jam':''})`;
+const lockNote=paidLock?' · 💸 sudah dibayar':(locked?' · 🔒 dipakai di Renovasi':'');
+return `<div class="wh-day-item${locked?'':' u-pointer'}" ${locked?'':`data-tk-hist-edit="1" data-tk-hist-worker="${w.id}" data-tk-hist-date="${a.date}"`}>
+        <div class="wh-day-info">
+          <div class="wh-day-date">${dateLabel}${locked?'':' <span class="u-fs10 u-t2 u-fw400">✏️</span>'}</div>
+          <div class="wh-day-time">${detail}${lockNote}</div>
+        </div>
+        <div class="wh-day-pay">${fmtFull(a.upah)}</div>
+        ${locked?'':`<button class="tx-del" data-stop="1" data-tk-hist-del="${a.id}" aria-label="Hapus">🗑</button>`}
+      </div>`;
+}).join(''):'<div class="empty"><div class="empty-text">Belum ada absensi dicatat untuk pekerja ini</div></div>';
+return `<div class="u-flex u-jcb u-aic u-pointer" data-tk-hist-toggle="${w.id}" style="margin-top:6px;padding-top:6px;border-top:1px solid var(--border)">
+        <span class="u-fs11 u-fw700 u-t2" style="text-transform:uppercase;letter-spacing:.5px">📋 Riwayat Absensi (${entries.length})</span>
+        <span class="u-fs11 u-t2">${isOpen?'▲ Tutup':'▼ Lihat'}</span>
+      </div>
+      ${isOpen?`<div class="u-fdcol u-gap6">${listHtml}</div>`:''}`;
+},
 openModal(){
 Tukang.weekStart=getWeekRange(new Date()).start;
 const today=todayStr();
@@ -518,6 +556,7 @@ return `<div class="tx-item u-fdcol u-gap8" style="align-items:stretch">
           <button class="tx-del" data-tk-del="${w.id}" aria-label="Hapus">🗑</button>
         </div>
         <div class="u-flex u-gap4">${chips}</div>
+        ${Tukang.renderWorkerHistory(w)}
       </div>`;
 }).join('');
 if(!listEl._tkDelegated){
@@ -527,6 +566,12 @@ const dayEl=e.target.closest('[data-tk-day]');
 if(dayEl){Tukang.openDayEntry(dayEl.getAttribute('data-tk-worker'),dayEl.getAttribute('data-tk-date'));return;}
 const delEl=e.target.closest('[data-tk-del]');
 if(delEl){Tukang.delWorker(delEl.getAttribute('data-tk-del'));return;}
+const histToggleEl=e.target.closest('[data-tk-hist-toggle]');
+if(histToggleEl){Tukang.toggleWorkerHistory(histToggleEl.getAttribute('data-tk-hist-toggle'));return;}
+const histDelEl=e.target.closest('[data-tk-hist-del]');
+if(histDelEl){Tukang.delAbsensiEntry(histDelEl.getAttribute('data-tk-hist-del'));return;}
+const histEditEl=e.target.closest('[data-tk-hist-edit]');
+if(histEditEl){Tukang.openDayEntry(histEditEl.getAttribute('data-tk-hist-worker'),histEditEl.getAttribute('data-tk-hist-date'));return;}
 };
 listEl.addEventListener('click',handleTap);
 }

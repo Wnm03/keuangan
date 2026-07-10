@@ -297,7 +297,7 @@ if(!elK||!elT)return;
 const all=[...D.bills,...(D.billsArchive||[])];
 const kategoris=[...new Set(all.map(b=>b.category).filter(Boolean))].sort();
 const prevK=elK.value;
-elK.innerHTML='<option value="all">Semua Kategori</option>'+kategoris.map(k=>`<option value="${k}">${k}</option>`).join('');
+elK.innerHTML='<option value="all">Semua Kategori</option>'+kategoris.map(k=>`<option value="${escapeHtml(k)}">${escapeHtml(k)}</option>`).join('');
 elK.value=kategoris.includes(prevK)?prevK:'all';
 billFilterKategori=elK.value;
 const tahuns=[...new Set(all.map(b=>{const d=new Date(b.kind==='cicilan'&&b.completedAt?b.completedAt:b.nextDue);return isNaN(d)?null:d.getFullYear();}).filter(Boolean))].sort((a,b)=>b-a);
@@ -310,7 +310,7 @@ billFilterTahun=elT.value;
 function openBillActionsMenu(id){
 const b=D.bills.find(x=>x.id===id);
 if(!b)return;
-document.getElementById('billActionsTitle').textContent=`🔔 ${escapeHtml(b.name)}`;
+document.getElementById('billActionsTitle').textContent=`🔔 ${b.name}`;
 document.getElementById('billActionsList').innerHTML=`
     <div class="bill-action-row" data-onclick="closeQS('qsBillActions');shareBillWA(${id})"><span class="bar-icon" style="color:#25D366">💬</span> Kirim ke WhatsApp</div>
     <div class="bill-action-row" data-onclick="closeQS('qsBillActions');openBillHistory(${id})"><span class="bar-icon u-cacc3">📋</span> Riwayat Pembayaran</div>

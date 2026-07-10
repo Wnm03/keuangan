@@ -47,6 +47,10 @@
     for (var i = 0; i < scripts.length; i++) {
       try {
         var u = new URL(scripts[i].src, location.href);
+        // Jangan ikutkan smoke-test.js sendiri: komentar dokumentasi di file ini
+        // memuat contoh literal "Modul.method" & pola id="..." yang kalau ikut
+        // di-scan akan salah kedeteksi sebagai referensi asli (false positive).
+        if (/(^|\/)smoke-test\.js$/.test(u.pathname)) continue;
         if (u.origin === location.origin) add(u.href);
       } catch (e) { /* skip src yang tidak valid */ }
     }
@@ -91,11 +95,31 @@
     return paths;
   }
 
+  // Ambil semua id yang "didefinisikan" di source, baik statis (id="xxx" di HTML/
+  // template string) maupun dinamis (elemen.id='xxx' lewat assignment JS -- pola
+  // umum dipakai buat elemen yang dibuat sekali lalu di-cache/reuse, mis. tombol
+  // "muat lebih banyak" yang baru ada di DOM setelah tab/list terkait dirender).
+  function extractDefinedIds(src) {
+    var ids = {};
+    var reAttr = /\bid=(['"])([A-Za-z0-9_-]+)\1/g;
+    var reAssign = /\.id\s*=\s*(['"])([A-Za-z0-9_-]+)\1/g;
+    var m;
+    while ((m = reAttr.exec(src))) ids[m[2]] = true;
+    while ((m = reAssign.exec(src))) ids[m[2]] = true;
+    return ids;
+  }
+
   // --- 3. Jalankan pengecekan ----------------------------------------------
-  function checkDomIds(ids) {
+  // "Hilang" hanya kalau id TIDAK ada di DOM sekarang DAN TIDAK ditemukan
+  // didefinisikan di mana pun di source (HTML statis atau assignment JS).
+  // Ini menghindari false positive utk elemen yang lazy-render (baru dibuat
+  // saat tab/section terkait pertama kali dibuka).
+  function checkDomIds(ids, definedIds) {
     var missing = [];
     for (var i = 0; i < ids.length; i++) {
-      if (!document.getElementById(ids[i])) missing.push(ids[i]);
+      if (document.getElementById(ids[i])) continue;
+      if (definedIds[ids[i]]) continue;
+      missing.push(ids[i]);
     }
     return missing;
   }
@@ -158,11 +182,12 @@
       }
 
       var ids = extractGetElementByIdIds(src.text);
+      var definedIds = extractDefinedIds(src.text);
       var actionPaths = extractDataActionPaths(src.text);
 
       result.domChecked = ids.length;
       result.actionChecked = Object.keys(actionPaths).length;
-      result.domMissing = checkDomIds(ids);
+      result.domMissing = checkDomIds(ids, definedIds);
       result.actionMissing = checkDataActionPaths(actionPaths);
 
       return result;
