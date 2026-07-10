@@ -53,7 +53,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <title>Keluarga W</title>
-<link rel="stylesheet" href="styles.css?v=113">
+<link rel="stylesheet" href="styles.css?v=122">
 <script>
 /* Debug console (Eruda) — aktifkan sekali lewat ?debug=1 di URL, nempel via localStorage.
    Matikan lagi lewat ?debug=0. Tidak aktif buat user biasa. */
@@ -105,8 +105,8 @@ b.appendChild(closeBtn);
 }catch(_e){ console.error('Gagal tampilkan banner error modul:',_e); }
 };
 </script>
-<script src="app-bundle-a.min.js?v=113" onerror="window.__moduleLoadFail('app-bundle-a.min.js')"></script>
-<script src="smoke-test.js?v=113" defer></script>
+<script src="app-bundle-a.min.js?v=122" onerror="window.__moduleLoadFail('app-bundle-a.min.js')"></script>
+<script src="smoke-test.js?v=122" defer></script>
 <link rel="manifest" id="pwaManifestLink" href="manifest.json">
 </head>
 <body data-theme="dark">
@@ -190,6 +190,7 @@ b.appendChild(closeBtn);
     <div class="u-flex1"><div class="u-fs12 u-fw700 u-cacc2" id="billBannerTitle">Tagihan jatuh tempo</div><div id="billBannerSub" class="u-fs12t2">-</div></div>
     <button class="btn btn-sm u-cacc2 u-fs12" style="background:var(--accent2-soft);border:1px solid var(--accent2)" data-onclick="showPage('settings',document.querySelector('[onclick*=settings]'))">Lihat</button>
   </div>
+  <div class="card u-mb12 u-dnone" id="finCoachCard"></div>
   <div class="card u-mb12" id="aiWidgetCard" style="background:linear-gradient(135deg,var(--accent-soft),var(--surface2));border:1px solid var(--accent)">
     <div class="card-title">🧭 Rekomendasi AI <span class="u-flexc8"><span class="card-collapse-toggle" id="aiWidgetCard-chev" data-action="toggleCardCollapse" data-args='["aiWidgetCard","$event"]' aria-label="Buka/tutup bagian">▾</span></span></div>
     <div class="card-collapse-body" id="aiWidgetCard-cbody">
@@ -745,6 +746,16 @@ b.appendChild(closeBtn);
   <div id="cobekTab-etalase" class="u-dnone">
     <button class="btn btn-primary btn-full" style="padding:14px;margin:12px 0" data-action="openProductModal" aria-label="Edit/Buka">+ Tambah Produk</button>
     <div class="u-fs12 u-t2 u-mb8">💡 Stok juga otomatis bertambah kalau kamu catat pengeluaran kategori "Bisnis" sub "Cobek" di tab Keuangan — 2 arah, tetap sinkron.</div>
+    <div class="card" id="priceRekoWidgetCard" style="display:none">
+      <div class="card-title">🤖 Rekomendasi Harga Jual AI</div>
+      <div class="u-fs12 u-t2 u-mb8">Estimasi cepat & gratis (rule-based, dari margin rata-rata produk sekategori + biaya transport BBM) — bukan hasil AI+web search. Tap 🔍 di produk yang ditandai buat verifikasi ke harga pasar sungguhan via AI.</div>
+      <div id="priceRekoWidgetList"></div>
+    </div>
+    <div class="card" id="stockRekoWidgetCard" style="display:none">
+      <div class="card-title">📦 Rekomendasi Restock AI</div>
+      <div class="u-fs12 u-t2 u-mb8">Estimasi cepat & gratis (rule-based, dari kecepatan jual histori Penjualan Shop) — produk yang stoknya diperkirakan habis dalam ≤14 hari ditandai di sini, lengkap saran jumlah tambahan.</div>
+      <div id="stockRekoWidgetList"></div>
+    </div>
     <div class="card"><div class="card-title">📦 Etalase Produk</div><div id="productList"><div class="empty"><div class="empty-icon">📦</div><div class="empty-text">Belum ada produk</div></div></div></div>
   </div>
 
@@ -2029,6 +2040,6 @@ b.appendChild(closeBtn);
 <script>document.write(MODAL_HTML[64]);</script><!-- modal:budgetSettingsModal externalized to modals.js -->
 <script>document.write(MODAL_HTML[65]);</script><!-- modal:refleksiModal (Refleksi & Self-Care) -->
 
-<script src="app-bundle-b.min.js?v=113" onerror="window.__moduleLoadFail('app-bundle-b.min.js')"></script>
+<script src="app-bundle-b.min.js?v=122" onerror="window.__moduleLoadFail('app-bundle-b.min.js')"></script>
 </body>
 </html>

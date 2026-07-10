@@ -1876,9 +1876,191 @@ Saya sengaja TIDAK melakukan pemindahan kode itu secara buta di sini karena:
   (Backup Data, Export CSV/JSON dari Laporan, Import CSV Cashew, Import Car Notes) sekali lagi utk
   memastikan rename tidak mengganggu apa pun.
 
-**PENTING untuk fase manapun berikutnya:** tetap wajib dites manual di
-browser (`?dev=1` + smoke-test + coba tiap halaman/modal terkait) sebelum
-lanjut ke domain berikutnya — lihat langkah di bawah.
+- ✨ **Fitur baru: widget "Tagihan Naik Signifikan"** (v119, build
+  kw76-tagihan-anomali-naik): bukan pemisahan file, tapi fitur baru —
+  badge peringatan di list Tagihan/Cicilan/Langganan (`billList` di
+  Pengaturan & `billListKeu` di Keuangan, keduanya dirender lewat
+  `renderBillList()` di `modules-render.js`) yang menyorot tagihan dgn
+  nominal terbaru (`b.amount`) jauh lebih tinggi dari rata-rata histori
+  pembayaran asli (transaksi tertaut `billLinkId`) — indikasi salah catat
+  nominal ATAU tarif beneran naik (listrik/pulsa/langganan), keduanya
+  layak dicek user sebelum bayar. Bukan widget AI — rule-based murni,
+  gratis, sama seperti pola "Rekomendasi Servis AI" (estimasi tanggal
+  servis dari rata-rata km/hari) yang sudah ada di `features-tukang-kendaraan-storage.js`.
+
+  Ditambahkan `getBillAnomalyInfo(billId, currentAmount)` di
+  `tagihan-kalender.js`: ambil s.d. 3 histori pembayaran terakhir
+  (`D.transactions` dgn `billLinkId===billId`), butuh minimal 2 titik histori
+  biar tidak false-positive dari kebetulan/variasi normal, bandingkan
+  `currentAmount` (nominal yg akan dipakai `markBillPaid()`) vs rata-ratanya
+  — kalau naik ≥25% (`BILL_ANOMALY_THRESHOLD_PCT`), tampilkan badge
+  `⚠️ Naik X% dari rata-rata Nx terakhir (Rp ...) — cek lagi sebelum bayar`
+  di bawah baris tagihan (`renderBillList()` di `modules-render.js`, dekat
+  `cicilanBar`). Tidak ditampilkan utk tagihan yang sudah lunas.
+
+  `tagihan-kalender.js` (GROUP_B) & `modules-render.js` (GROUP_A) beda grup
+  — `getBillAnomalyInfo` dipanggil dari `modules-render.js` sbg variabel
+  global saat `renderBillList()` jalan di RUNTIME (bukan saat file
+  dimuat), jadi aman walau `tagihan-kalender.js` dimuat belakangan (pola
+  cross-grup yang sama seperti FI/Budget wrapper migrations sebelumnya).
+  `build.js` TIDAK berubah (tidak ada file baru/pindah grup, cuma nambah
+  kode di file yang sudah ada).
+
+  Dicek: `getBillAnomalyInfo`/`BILL_ANOMALY_THRESHOLD_PCT` cuma dideklarasi
+  1x di source (`tagihan-kalender.js`) & 1x di `app-bundle-b.min.js` (0x
+  duplikat di `app-bundle-a.min.js`, cuma 1 pemanggilan runtime dari
+  `modules-render.js` yang ikut ke `app-bundle-a.min.js`), `node --check`
+  lolos di kedua file source & kedua bundle, `index.html`/
+  `app_production.html` konsisten `?v=119`. **Belum**: tidak bisa dites
+  tampilan sungguhan di browser (tidak ada environment browser di sini) —
+  tetap wajib coba manual: cari/buat 1 tagihan berulang yang sudah punya
+  ≥2 riwayat pembayaran (mis. dari `markBillPaid()` beberapa bulan), lalu
+  edit nominal tagihan itu (✏️/edit) jadi jauh lebih besar (≥25% dari
+  rata-rata sebelumnya) & simpan — pastikan badge oranye "⚠️ Naik X%..."
+  muncul di bawah baris tagihan itu (baik di Pengaturan maupun kartu
+  Tagihan di Keuangan), lalu kembalikan nominal ke wajar & pastikan badge
+  hilang. Threshold 25% & jumlah histori (3x) di `BILL_ANOMALY_THRESHOLD_PCT`
+  bisa diubah gampang di `tagihan-kalender.js` kalau ternyata kurang/kelewat
+  sensitif setelah dipakai beneran.
+
+- 🔧 **Refactor: 5 fitur AI disatukan lewat 1 fungsi bersama `callAIProviderRaw`**
+  (v120, build kw77-rapikan-callai-shared): bukan fitur baru — beresin utang teknis.
+  Sebelumnya 6 fitur yang manggil Claude/Gemini (Chat Asisten `_sendChatInner`,
+  AIWidget laporan analisis, `RenovAI.suggest`, `RefAI.check`, `PriceReko.checkMarketAI`,
+  `EduFund.checkAI`) masing2 COPY-PASTE sendiri kode `fetch()` ke kedua provider (~40-50
+  baris duplikat x5, cuma beda systemPrompt/maxTokens/perlu web_search atau tidak).
+  Cuma AIWidget yang sudah pakai `callAIProviderRaw` (fungsi ini awalnya dibuat khusus
+  utk AIWidget doang, tidak dipakai fitur lain).
+
+  `callAIProviderRaw` (di `features-aiwidget-reminder-gdrive-search.js`) di-upgrade jadi
+  generik: terima `opts` opsional `{maxTokens, webSearch}` — `webSearch:true` aktifkan tool
+  `google_search` (Gemini) / `web_search_20250305` (Claude), dibutuhkan RefAI/PriceReko/
+  EduFund yang emang cari info TERBARU (harga emas, harga pasar, biaya sekolah), TIDAK
+  dipakai chat/AIWidget/RenovAI yang cuma butuh saran dari data yang sudah ada. Ekstraksi teks
+  balasan juga dibetulkan: sekarang gabung SEMUA blok teks (`filter(type==='text').join('\n')`)
+  bukan cuma blok pertama — penting utk balasan yang pakai web_search (bisa ada beberapa blok
+  teks diselang hasil pencarian). Ditambah `aiErrorHint(provider,status)` — helper kecil utk
+  pesan hint per status HTTP (Claude 401 / Gemini 400,403) yang dulu ditulis manual beda2 dikit
+  di tiap fitur, sekarang konsisten satu tempat.
+
+  5 pemanggil (chat, RenovAI, RefAI, PriceReko, EduFund) diganti dari blok fetch manual jadi
+  `await callAIProviderRaw(systemPrompt, messages, opts)` — logic per fitur (parsing JSON,
+  update DOM spesifik, pesan toast) TIDAK diubah, cuma bagian "cara manggil API"-nya yang
+  disatukan. `RenovAI`/`RefAI`/`PriceReko`(`cobek.js`)/`EduFund` ada di GROUP_A, sedangkan
+  `callAIProviderRaw` ada di GROUP_B (dimuat belakangan) — aman krn ke-4 fungsi itu cuma
+  dipanggil saat tombol AI diklik (runtime, jauh setelah kedua bundle dimuat), pola yang sama
+  persis dgn migrasi FI/Budget wrapper GROUP_B→pemanggilan-dari-GROUP_A sebelumnya (v90/v91).
+  `build.js` TIDAK berubah (tidak ada file baru/pindah grup).
+
+  Dicek: `callAIProviderRaw`/`aiErrorHint` cuma dideklarasi 1x di source & 1x di
+  `app-bundle-b.min.js` (0x di `app-bundle-a.min.js`), pola fetch lama ke
+  `api.anthropic.com/v1/messages` & `generativelanguage.googleapis.com` sudah 0x tersisa di
+  `app-bundle-a.min.js` (dulu ada di `renovasi.js`/`pajak-pbb-zakat.js`/`cobek.js`/
+  `edukasi-dana.js`, semua GROUP_A), `node --check` lolos di ke-5 file source yang diubah &
+  kedua bundle, `index.html`/`app_production.html` konsisten `?v=120`. **Belum**: tidak bisa
+  dites tampilan sungguhan di browser (tidak ada environment browser di sini) — tetap WAJIB
+  coba manual MENYELURUH krn ini nyentuh titik gagal (API call) di 5 fitur berbeda: (1) Chat
+  Asisten — kirim 1 pesan biasa & 1 yang trigger usul aksi (mis. "catat aku beli bensin 20rb"),
+  pastikan balasan & tombol konfirmasi masih muncul; (2) AIWidget — generate laporan analisis
+  dari Dashboard; (3) RenovAI — buka proyek renovasi, tap "🤖 Saran AI"; (4) RefAI — Pengaturan
+  → Pajak/Zakat → "🔍 Cek Update via AI"; (5) PriceReko — Cobek, isi nama produk, tap "Cek
+  Harga Pasar (AI)"; (6) EduFund — Dana Pendidikan, "Cek Estimasi Biaya" pakai nama sekolah.
+  Coba juga skenario API key SALAH/kosong di tiap fitur, pastikan pesan error masih masuk akal
+  (bukan cuma di chat & AIWidget yang lama sudah pakai jalur ini). Kalau semua lolos, refactor
+  ini bikin nambah provider AI baru (mis. OpenAI) atau ganti model cukup diubah di 1 tempat
+  (`callAIProviderRaw`), bukan 5-6 tempat terpisah kayak sebelumnya.
+
+- ✨ **Fitur baru: "🩺 AI Financial Coach" — insight proaktif** (v122, build
+  kw78-fincoach-proaktif): fitur baru, bukan pemisahan file. Widget baru di
+  paling atas Dashboard (`finCoachCard`, di atas `aiWidgetCard`) yang
+  otomatis menghitung & menampilkan MAKS 4 insight paling mendesak tiap
+  Dashboard dibuka — TANPA panggil AI/API sama sekali (rule-based & instan,
+  jadi gratis & tidak butuh API key), beda dari `AIWidget` yang sudah ada
+  (laporan 1x jalan, harus tap tombol, WAJIB API key Claude/Gemini).
+
+  Modul baru `FinCoach` ditaruh di `modules-calc.js` (GROUP_A, setelah
+  `Pensiun` sebelum `Kekayaan`) — 9 pengecekan rule-based sekaligus:
+  (1) defisit bulan berjalan, (2) anggaran ≥80%/over, (3) tagihan
+  telat/segera jatuh tempo (reuse `getBillStats()`), (4) tagihan naik
+  signifikan (reuse `getBillAnomalyInfo()` dari `tagihan-kalender.js`),
+  (5) saldo akun minus, (6) utang jatuh tempo ≤7 hari, (7) rata-rata
+  surplus bulanan negatif (reuse `fiMonthlySurplus()`), (8) margin profit
+  Shop/Cobek turun ≥25% vs bulan lalu (min. 3 transaksi bulan ini biar
+  tidak false-positive), (9) target tabungan hampir tercapai (90-99%,
+  penguat positif). Kalau tidak ada sinyal bahaya/peringatan sama sekali,
+  tampilkan 1 insight positif (surplus & rasio bulan ini) supaya widget
+  tidak kosong. Tiap insight bisa di-dismiss sendiri-sendiri (✕, disimpan
+  by id di localStorage `kw_fincoach_dismissed`, tidak akan muncul lagi
+  sampai data yg mendasarinya berubah cukup buat generate id baru), &
+  beberapa insight punya tombol aksi cepat (`data-action="showPage"`
+  langsung ke halaman terkait). "Lihat semua" (kalau insight >4) pakai
+  `showAlertModal()` yang sudah ada.
+
+  `renderDashboard()` di `modules-render.js` (GROUP_A, dimuat SEBELUM
+  `modules-calc.js` dalam urutan `GROUP_A`) manggil
+  `FinCoach.renderDash()` — aman krn ini panggilan RUNTIME (baru jalan
+  saat Dashboard dibuka user, jauh setelah semua file GROUP_A selesai
+  dimuat), pola yang identik dengan `DanaDaruratAI.renderDash()`/
+  `AIWidget.render()` yang sudah dipanggil di fungsi yang sama sebelumnya.
+  `index.html`/`app_production.html`: tambah 1 div placeholder kosong
+  `<div class="card u-mb12 u-dnone" id="finCoachCard"></div>` tepat
+  sebelum `aiWidgetCard` (pola sama seperti `dashServisReminderCard`/
+  `dashDanaDaruratCard` dst — JS yang isi & toggle visibility-nya, HTML
+  cuma placeholder). `build.js` TIDAK berubah (tidak ada file baru/pindah
+  grup, cuma nambah kode di file yang sudah ada + 1 div baru di HTML).
+
+  Dicek: `FinCoach` cuma dideklarasi 1x di source (`modules-calc.js`) &
+  1x di `app-bundle-a.min.js` (0x di `app-bundle-b.min.js`), `finCoachCard`
+  cuma muncul 1x di `index.html` & `app_production.html`, `node --check`
+  lolos di source & kedua bundle, lint bawaan `build.js` (u-dnone vs
+  style.display, field user tanpa escapeHtml) lolos tanpa temuan,
+  `index.html`/`app_production.html` konsisten `?v=122`. **Belum**: tidak
+  bisa dites tampilan sungguhan di browser (tidak ada environment browser
+  di sini) — WAJIB coba manual: buka Dashboard, pastikan card "🩺 AI
+  Financial Coach" muncul di atas card "🧭 Rekomendasi AI" (kalau ada data
+  yg memicu salah satu dari 9 sinyal di atas — coba dgn sengaja bikin 1
+  anggaran lewat limit, atau 1 tagihan telat bayar, dst); coba tap ✕ pada
+  1 insight → pastikan hilang & tidak muncul lagi setelah balik ke
+  Dashboard lagi (tapi insight LAIN yg beda id tetap muncul); coba tap
+  tombol aksi (mis. "Cek Laporan →") → pastikan pindah ke halaman yang
+  benar; kalau insight >4, coba tap "Lihat semua" → pastikan modal alert
+  muncul isi semua insight; terakhir coba kondisi "semua aman" (tidak ada
+  anggaran/tagihan/utang bermasalah) → pastikan muncul 1 insight hijau
+  positif, bukan card kosong/hilang.
+
+  **Ide lanjutan kalau mau dikembangkan lagi** (belum dikerjakan): (a)
+  tombol "🤖 Tanya AI soal ini" di tiap insight yang langsung buka
+  `AIWidget.openChat()` dgn pertanyaan pre-filled spesifik ke insight itu
+  (skrg cuma tombol navigasi halaman biasa); (b) insight tambahan spesifik
+  utk pola LDR/Tukang/absensi (mis. "belum ada absensi tercatat >5 hari
+  kerja") kalau memang relevan dipantau proaktif juga; (c) histori insight
+  (kapan pertama kali muncul, berapa lama bertahan) buat lihat tren,
+  skrg cuma snapshot terkini tiap render.
+
+- ✨ **Fitur baru: Scan struk pakai AI Vision** (BELUM DIKERJAKAN — lihat
+  catatan di bawah): permintaan kedua dari sesi yang sama dgn FinCoach di
+  atas (v122), sengaja belum disentuh di build ini sesuai instruksi
+  "kerjakan salah satunya". `scan-ocr.js` (715 baris) saat ini pakai
+  Tesseract.js (OCR) + puluhan regex per jenis scan (struk belanja, bukti
+  transfer, screenshot checkout marketplace, dst — lihat
+  `scanReceipt()`, `scanBuktiTransfer()`, `scanWorthItCheckout()` dst).
+  Ganti ke AI Vision (kirim foto langsung ke Claude/Gemini vision API,
+  minta JSON terstruktur balik) akan JAUH lebih akurat utk struk
+  miring/buram/tulisan tangan, tapi PERUBAHAN BESAR yg beda karakter dari
+  fitur2 lain di roadmap ini: (1) butuh API key terisi (skrg OCR jalan
+  tanpa API key sama sekali — kalau AI Vision jadi satu2nya cara, user
+  tanpa API key kehilangan fitur scan total; perlu diputuskan: AI Vision
+  sbg default+fallback ke OCR lama, atau opsional lewat toggle), (2) tiap
+  scan jadi ada biaya (panggilan API vision berbayar) beda dari OCR lokal
+  yg gratis, (3) perlu system prompt terpisah per jenis scan (struk vs
+  bukti transfer vs checkout marketplace) supaya field yg diminta balik
+  sesuai form masing2, bisa reuse `callAIProviderRaw()` yg sudah ada tapi
+  perlu tambahan dukungan kirim gambar (base64) di payload — saat ini
+  `callAIProviderRaw()` cuma terima `messages` teks. Disarankan dikerjakan
+  di sesi terpisah supaya bisa fokus & dites manual menyeluruh (minimal
+  4 jenis scan yg ada sekarang) sebelum lanjut ke domain lain.
+
+
 
 ## Rencana konkret untuk fase berikutnya (per-halaman sungguhan)
 

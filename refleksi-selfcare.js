@@ -12,6 +12,57 @@ const REFLEKSI_SELFCARE_ITEMS=[
 {id:'sc4',label:'🧘 Waktu tenang utk diri sendiri'},
 {id:'sc5',label:'📵 Kurangi screen time berlebih'}
 ];
+// SelfCareReko — widget rekomendasi ringan di tab Self-Care: baca 14 hari terakhir checklist
+// self-care (D.refleksi.selfCareLog) + jurnal syukur (D.refleksi.gratitude), lalu kasih SATU
+// saran paling relevan. Sengaja dibuat beda dari LifeBalance.getFocusAreas() (hidup-seimbang.js)
+// yang fokus ke skor finansial/keseimbangan (Dana Darurat, DSR, No-Spend, Kerja-Istirahat) --
+// widget ini fokus ke 5 item checklist self-care harian itu sendiri, yang datanya tidak dipakai
+// LifeBalance sama sekali.
+// PENTING nada/tone: dibuat suportif & tanpa nge-judge (selaras sama hint bawaan tab ini --
+// "Ringan saja, jangan jadi beban"), BUKAN daftar kegagalan/skor per-item yang bisa berasa
+// menghakimi. Tidak menyimpulkan/psikoanalisa penyebab, cuma refleksikan pola dari data yang ada.
+const SelfCareReko={
+compute(){
+const log=D.refleksi.selfCareLog||{};
+const days=[];
+const d=new Date();
+for(let i=0;i<14;i++){
+days.push(dateToISO(d));
+d.setDate(d.getDate()-1);
+}
+const loggedDays=days.filter(iso=>log[iso]&&log[iso].length);
+if(loggedDays.length<5){
+return {ready:false,note:'Isi checklist self-care beberapa hari lagi dulu ya, biar saran di sini bisa lebih pas.'};
+}
+const perItem=REFLEKSI_SELFCARE_ITEMS.map(it=>{
+const count=loggedDays.filter(iso=>(log[iso]||[]).includes(it.id)).length;
+return {...it,count,pct:Math.round((count/loggedDays.length)*100)};
+});
+const weakest=perItem.slice().sort((a,b)=>a.pct-b.pct)[0];
+const gratitudeCount=(D.refleksi.gratitude||[]).filter(g=>days.includes(g.date)).length;
+return {ready:true,loggedDaysCount:loggedDays.length,weakest,gratitudeCount};
+},
+render(){
+const el=document.getElementById('refSelfCareRekoBox');
+if(!el)return;
+const r=this.compute();
+if(!r.ready){
+// lint-ok-no-escape: r.note selalu string tetap yg ditulis di compute() di atas, bukan data ketikan user
+el.innerHTML=`<div class="u-fs11 u-t2 u-r8 u-lh14" style="padding:8px 10px;background:var(--surface2);margin-bottom:12px">💡 ${r.note}</div>`;
+return;
+}
+const parts=[];
+if(r.weakest.pct<60){
+parts.push(`<b>${r.weakest.label}</b> kelihatan paling sering kelewat belakangan ini (${r.weakest.count}/${r.loggedDaysCount} hari tercatat). Kalau mau, coba fokus ke ini dulu minggu ini — pelan-pelan aja, gak perlu langsung sempurna.`);
+} else {
+parts.push('🎉 Semua item checklist udah cukup konsisten belakangan ini. Pertahankan ya!');
+}
+if(r.gratitudeCount===0){
+parts.push('Belum ada catatan syukur 14 hari terakhir — kalau ada waktu sebentar, coba tulis 1 hal kecil aja di tab 🙏 Syukur.');
+}
+el.innerHTML=`<div class="u-fs11 u-r8 u-lh14" style="padding:9px 10px;background:var(--accent-soft);margin-bottom:12px">💡 ${parts.join(' ')}</div>`;
+}
+};
 const Refleksi={
 curTab:'syukur',
 _revealed:{},
@@ -110,6 +161,7 @@ return `<div class="setting-item" style="padding:10px 0;cursor:pointer" data-act
 }).join('');
 const streakEl=document.getElementById('refStreakVal');
 if(streakEl)streakEl.textContent=this.computeStreak()+' hari';
+SelfCareReko.render();
 const histEl=document.getElementById('refSelfCareHistory');
 if(histEl){
 const log=D.refleksi.selfCareLog||{};

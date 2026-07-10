@@ -187,51 +187,13 @@ document.getElementById('refAiBody').innerHTML='<div class="empty"><div class="e
 openModal('refAiModal');
 if(btn){btn.disabled=true;btn.textContent='🔍 Mencari...';}
 try{
-let textOut;
-if(provider==='gemini'){
-const url=`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(apiKey)}`;
-const res=await fetch(url,{
-method:'POST',
-headers:{'Content-Type':'application/json'},
-body:JSON.stringify({
-system_instruction:{parts:[{text:RefAI.systemPrompt()}]},
-contents:[{role:'user',parts:[{text:'Cari & kasih 3 angka referensi zakat/emas terbaru sesuai format JSON yang diminta.'}]}],
-tools:[{google_search:{}}],
-generationConfig:{maxOutputTokens:2048}
-})
-});
-const data=await res.json();
-if(!res.ok){
-const errMsg=data?.error?.message||`HTTP ${res.status}`;
-document.getElementById('refAiBody').innerHTML=`<div class="empty"><div class="empty-icon">⚠️</div><div class="empty-text">Gagal hubungi Gemini: ${escapeHtml(errMsg)}${res.status===400||res.status===403?' (cek API key di Pengaturan)':''}</div></div>`;
+const r=await callAIProviderRaw(RefAI.systemPrompt(),[{role:'user',content:'Cari & kasih 3 angka referensi zakat/emas terbaru sesuai format JSON yang diminta.'}],{maxTokens:2048,webSearch:true});
+if(!r.ok){
+const label=provider==='gemini'?'Gemini':'Claude';
+document.getElementById('refAiBody').innerHTML=`<div class="empty"><div class="empty-icon">⚠️</div><div class="empty-text">Gagal hubungi ${label}: ${escapeHtml(r.errMsg||'error tidak diketahui')}${aiErrorHint(provider,r.status)}</div></div>`;
 return;
 }
-textOut=(data.candidates?.[0]?.content?.parts||[]).filter(p=>p.text).map(p=>p.text).join('\n').trim();
-} else {
-const res=await fetch('https://api.anthropic.com/v1/messages',{
-method:'POST',
-headers:{
-'Content-Type':'application/json',
-'x-api-key':apiKey,
-'anthropic-version':'2023-06-01',
-'anthropic-dangerous-direct-browser-access':'true'
-},
-body:JSON.stringify({
-model:'claude-sonnet-4-6',
-max_tokens:1500,
-system:RefAI.systemPrompt(),
-messages:[{role:'user',content:'Cari & kasih 3 angka referensi zakat/emas terbaru sesuai format JSON yang diminta.'}],
-tools:[{type:'web_search_20250305',name:'web_search'}]
-})
-});
-const data=await res.json();
-if(!res.ok){
-const errMsg=data?.error?.message||`HTTP ${res.status}`;
-document.getElementById('refAiBody').innerHTML=`<div class="empty"><div class="empty-icon">⚠️</div><div class="empty-text">Gagal hubungi Claude: ${escapeHtml(errMsg)}${res.status===401?' (API key salah/expired)':''}</div></div>`;
-return;
-}
-textOut=(data.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('\n').trim();
-}
+const textOut=r.text;
 const parsed=RefAI._parseJSON(textOut);
 if(!parsed){
 document.getElementById('refAiBody').innerHTML=`<div class="empty"><div class="empty-icon">⚠️</div><div class="empty-text">Balasan AI tidak bisa dibaca sebagai data referensi. Coba lagi.</div></div>`;

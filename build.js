@@ -90,6 +90,7 @@ const GROUP_B = [
   'transaksi.js',
   'profil-pengaturan.js',
   'kategori.js',
+  'kategorisasi-ai.js',
   'tagihan-kalender.js',
   'backup-restore.js',
   'payroll-absensi.js',

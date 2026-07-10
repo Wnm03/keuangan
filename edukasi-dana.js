@@ -150,27 +150,13 @@ const sysPrompt=`Kamu asisten riset utk aplikasi keuangan keluarga Indonesia. Ca
 {"biayaEstimasi":{"value": <angka Rp, atau null kalau tidak ketemu>, "source":"<sumber & rincian singkat>", "tanggal":"<kapan info ini berlaku>"}}
 Kalau tidak yakin/tidak ketemu, isi value null & jelaskan di source. JANGAN mengarang angka.`;
 try{
-let textOut;
-if(provider==='gemini'){
-const url=`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(apiKey)}`;
-const res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
-system_instruction:{parts:[{text:sysPrompt}]},
-contents:[{role:'user',parts:[{text:'Cari & kasih estimasi biaya sesuai format JSON yang diminta.'}]}],
-tools:[{google_search:{}}],generationConfig:{maxOutputTokens:1024}
-})});
-const data=await res.json();
-if(!res.ok){toast('❌ Gagal hubungi Gemini: '+(data?.error?.message||`HTTP ${res.status}`));return;}
-textOut=(data.candidates?.[0]?.content?.parts||[]).filter(p=>p.text).map(p=>p.text).join('\n').trim();
-}else{
-const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({
-model:'claude-sonnet-4-6',max_tokens:1000,system:sysPrompt,
-messages:[{role:'user',content:'Cari & kasih estimasi biaya sesuai format JSON yang diminta.'}],
-tools:[{type:'web_search_20250305',name:'web_search'}]
-})});
-const data=await res.json();
-if(!res.ok){toast('❌ Gagal hubungi Claude: '+(data?.error?.message||`HTTP ${res.status}`));return;}
-textOut=(data.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('\n').trim();
+const r=await callAIProviderRaw(sysPrompt,[{role:'user',content:'Cari & kasih estimasi biaya sesuai format JSON yang diminta.'}],{maxTokens:1024,webSearch:true});
+if(!r.ok){
+const label=provider==='gemini'?'Gemini':'Claude';
+toast('❌ Gagal hubungi '+label+': '+(r.errMsg||'error tidak diketahui'));
+return;
 }
+const textOut=r.text;
 const parsed=RefAI._parseJSON(textOut);
 const item=parsed&&parsed.biayaEstimasi;
 if(!item||item.value===null||item.value===undefined||!isFinite(Number(item.value))||Number(item.value)<=0){

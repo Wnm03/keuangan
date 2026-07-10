@@ -417,49 +417,13 @@ if(!apiKey){toast('⚠️ Belum ada API Key. Isi dulu di Pengaturan → AI Asist
 document.getElementById('renovAiBody').innerHTML='<div class="empty"><div class="empty-icon">🤖</div><div class="empty-text">Menyusun saran... (bisa beberapa detik)</div></div>';
 openModal('renovAiModal');
 try{
-let textOut;
-if(provider==='gemini'){
-const url=`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(apiKey)}`;
-const res=await fetch(url,{
-method:'POST',
-headers:{'Content-Type':'application/json'},
-body:JSON.stringify({
-system_instruction:{parts:[{text:RenovAI.systemPrompt()}]},
-contents:[{role:'user',parts:[{text:RenovAI.buildUserPrompt(p)}]}],
-generationConfig:{maxOutputTokens:1200}
-})
-});
-const data=await res.json();
-if(!res.ok){
-const errMsg=data?.error?.message||`HTTP ${res.status}`;
-document.getElementById('renovAiBody').innerHTML=`<div class="empty"><div class="empty-icon">⚠️</div><div class="empty-text">Gagal hubungi Gemini: ${escapeHtml(errMsg)}</div></div>`;
+const r=await callAIProviderRaw(RenovAI.systemPrompt(),[{role:'user',content:RenovAI.buildUserPrompt(p)}],{maxTokens:1200});
+if(!r.ok){
+const label=provider==='gemini'?'Gemini':'Claude';
+document.getElementById('renovAiBody').innerHTML=`<div class="empty"><div class="empty-icon">⚠️</div><div class="empty-text">Gagal hubungi ${label}: ${escapeHtml(r.errMsg||'error tidak diketahui')}${aiErrorHint(provider,r.status)}</div></div>`;
 return;
 }
-textOut=(data.candidates?.[0]?.content?.parts||[]).filter(pt=>pt.text).map(pt=>pt.text).join('\n').trim();
-} else {
-const res=await fetch('https://api.anthropic.com/v1/messages',{
-method:'POST',
-headers:{
-'Content-Type':'application/json',
-'x-api-key':apiKey,
-'anthropic-version':'2023-06-01',
-'anthropic-dangerous-direct-browser-access':'true'
-},
-body:JSON.stringify({
-model:'claude-sonnet-4-6',
-max_tokens:1200,
-system:RenovAI.systemPrompt(),
-messages:[{role:'user',content:RenovAI.buildUserPrompt(p)}]
-})
-});
-const data=await res.json();
-if(!res.ok){
-const errMsg=data?.error?.message||`HTTP ${res.status}`;
-document.getElementById('renovAiBody').innerHTML=`<div class="empty"><div class="empty-icon">⚠️</div><div class="empty-text">Gagal hubungi Claude: ${escapeHtml(errMsg)}${res.status===401?' (API key salah/expired)':''}</div></div>`;
-return;
-}
-textOut=(data.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('\n').trim();
-}
+const textOut=r.text;
 if(!textOut){
 document.getElementById('renovAiBody').innerHTML='<div class="empty"><div class="empty-icon">⚠️</div><div class="empty-text">AI tidak memberi balasan teks. Coba lagi.</div></div>';
 return;

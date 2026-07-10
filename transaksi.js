@@ -13,6 +13,7 @@ document.getElementById('btnI').className='type-btn'+(t==='income'?' ai':'');
 document.getElementById('btnE').className='type-btn'+(t==='expense'?' ae':'');
 hideSuggestBox('txCatSuggestBox');
 hideSuggestBox('txSubCatSuggestBox');
+if(typeof AutoKat!=='undefined'){AutoKat.hideSuggest();AutoKat._lastNoteQueried='';}
 updateTxVehiclePanels();
 }
 function updateSubCatOptions(){
@@ -530,6 +531,7 @@ document.getElementById('txAmt').value='';
 document.getElementById('txCat').value='';
 document.getElementById('txSubCat').value='';
 document.getElementById('txNote').value='';
+if(typeof AutoKat!=='undefined'){AutoKat.hideSuggest();AutoKat._lastNoteQueried='';}
 const scanInsightEl=document.getElementById('txScanInsight'); if(scanInsightEl){scanInsightEl.style.display='none';scanInsightEl.innerHTML='';}
 cicilanLastInput='total';
 cicilanDateLinked=false;
@@ -589,6 +591,7 @@ document.getElementById('txModalTitle').textContent='Edit Transaksi';
 document.getElementById('txDelBtn').style.display='flex';
 resetPayMethodLock();
 const scanInsightElEdit=document.getElementById('txScanInsight'); if(scanInsightElEdit){scanInsightElEdit.style.display='none';scanInsightElEdit.innerHTML='';}
+if(typeof AutoKat!=='undefined'){AutoKat.hideSuggest();AutoKat._lastNoteQueried='';}
 populateAccFilters();
 curTxType=t.type;
 document.getElementById('btnI').className='type-btn'+(t.type==='income'?' ai':'');

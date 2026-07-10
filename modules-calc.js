@@ -1,5 +1,5 @@
 
-const MODULE_CALC_VERSION='kw70-tukang-riwayat-absensi-18';
+const MODULE_CALC_VERSION='kw78-fincoach-proaktif';
 const FI={
 assetScopeState:'zakatable',
 investmentAssetValue(){
@@ -572,6 +572,160 @@ el.innerHTML=`
         <div class="stat-box"><div class="stat-label">Proyeksi @Pensiun</div><div class="stat-val u-fs13">${fmt(proyeksi)}</div></div>
       </div>
     `;
+}
+};
+// FinCoach — "🩺 AI Financial Coach": insight PROAKTIF, rule-based & INSTAN (bukan panggilan
+// AI/API — jadi TIDAK butuh API key & tidak ada biaya sama sekali), beda dari AIWidget (laporan
+// lengkap 1x jalan, harus tap tombol dulu, WAJIB API key) yang sudah ada di
+// features-aiwidget-reminder-gdrive-search.js. FinCoach otomatis dihitung ulang & tampil tiap buka
+// Dashboard, mengecek beberapa sinyal keuangan/bisnis/hidup sekaligus (defisit bulan berjalan,
+// anggaran jebol, tagihan telat/naik aneh, saldo minus, utang jatuh tempo, surplus FI negatif,
+// margin bisnis Shop turun, target tabungan hampir tercapai) & menampilkan MAKS 4 yang paling
+// mendesak dulu (urutan bahaya>peringatan>info>bagus) — supaya tidak perlu buka satu2 tiap halaman
+// buat tahu ada masalah. Polanya sama seperti widget rule-based lain yg sudah ada (badge anomali
+// tagihan di renderBillList(), Rekomendasi Servis AI, DanaDaruratAI di atas) — cuma FinCoach
+// menggabungkan beberapa sinyal itu jadi SATU widget ringkasan di paling atas Dashboard.
+const FinCoach={
+DISMISS_LS_KEY:'kw_fincoach_dismissed',
+compute(){
+const out=[];
+const now=new Date(),m=now.getMonth(),y=now.getFullYear();
+const txM=D.transactions.filter(t=>{const d=new Date(t.date);return d.getMonth()===m&&d.getFullYear()===y;});
+const inc=txM.filter(t=>t.type==='income').reduce((s,t)=>s+t.amount,0);
+const exp=txM.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0);
+// 1. Defisit bulan berjalan (pengeluaran > pemasukan bulan ini)
+if(inc>0&&exp>inc){
+out.push({id:'defisit',level:'danger',icon:'🔴',text:`Bulan ini pengeluaran (${fmtFull(exp)}) sudah melebihi pemasukan (${fmtFull(inc)}) — defisit ${fmtFull(exp-inc)}.`,action:{label:'Cek Laporan',page:'keuangan',navIdx:1}});
+}
+// 2. Anggaran paling parah (>=80% terpakai), ambil yang paling tinggi persennya
+try{
+if((D.budgets||[]).length){
+const rows=D.budgets.map(b=>{
+const used=D.transactions.filter(t=>{const d=new Date(t.date);return d.getMonth()===m&&d.getFullYear()===y&&budgetMatchesTx(b,t);}).reduce((s,t)=>s+t.amount,0);
+const pct=b.limit>0?Math.round(used/b.limit*100):0;
+return{b,pct};
+}).filter(r=>r.pct>=80).sort((a,b)=>b.pct-a.pct);
+if(rows.length){
+const r=rows[0],over=r.pct>=100;
+out.push({id:'budget-'+r.b.id,level:over?'danger':'warning',icon:over?'🔴':'🟠',text:`Anggaran "${escapeHtml(r.b.name)}" sudah ${r.pct}% terpakai${over?' (OVER)':''}${rows.length>1?` (+${rows.length-1} anggaran lain juga ketat)`:''}.`,action:{label:'Lihat Anggaran',page:'keuangan',navIdx:1}});
+}
+}
+}catch(e){console.warn('FinCoach: gagal cek anggaran',e);}
+// 3. Tagihan telat/segera jatuh tempo (pakai getBillStats() yg sudah ada, dipakai jg di dashBillCard)
+try{
+if(typeof getBillStats==='function'){
+const s=getBillStats();
+if(s.overdueCount>0){
+out.push({id:'bill-overdue',level:'danger',icon:'🔴',text:`${s.overdueCount} tagihan/cicilan sudah lewat jatuh tempo (estimasi sisa tunggakan ${fmtFull(s.outstanding)}).`,action:{label:'Bayar Sekarang',page:'settings',navIdx:6}});
+} else if(s.soonCount>0){
+out.push({id:'bill-soon',level:'info',icon:'🔔',text:`${s.soonCount} tagihan jatuh tempo dalam 7 hari ke depan (total tagihan bulan ini ${fmtFull(s.monthTotal)}).`,action:{label:'Lihat Tagihan',page:'settings',navIdx:6}});
+}
+}
+}catch(e){console.warn('FinCoach: gagal cek tagihan',e);}
+// 4. Tagihan yang nominalnya naik signifikan dari biasanya (reuse getBillAnomalyInfo di tagihan-kalender.js)
+try{
+if(typeof getBillAnomalyInfo==='function'){
+const anomalies=D.bills.map(b=>({b,info:getBillAnomalyInfo(b.id,b.amount)})).filter(x=>x.info);
+if(anomalies.length){
+anomalies.sort((a,b)=>b.info.pctChange-a.info.pctChange);
+const top=anomalies[0];
+out.push({id:'bill-anomaly-'+top.b.id,level:'warning',icon:'🟠',text:`Tagihan "${escapeHtml(top.b.name)}" naik ${top.info.pctChange}% dari rata-rata ${top.info.count}x terakhir (${fmtFull(top.info.avgPrev)}) — cek lagi sebelum bayar.`});
+}
+}
+}catch(e){console.warn('FinCoach: gagal cek anomali tagihan',e);}
+// 5. Saldo akun minus
+try{
+const negAcc=D.accounts.find(a=>recalcAccBalance(a.id)<0);
+if(negAcc){
+out.push({id:'acc-negative-'+negAcc.id,level:'danger',icon:'🔴',text:`Saldo akun "${escapeHtml(negAcc.name)}" minus (${fmtFull(recalcAccBalance(negAcc.id))}) — cek transaksi yang mungkin belum tercatat.`});
+}
+}catch(e){console.warn('FinCoach: gagal cek saldo akun',e);}
+// 6. Utang belum lunas yang jatuh tempo dekat (<=7 hari, termasuk yang sudah lewat)
+try{
+const soonDebt=(D.debts||[]).filter(d=>!d.lunas&&d.jatuhTempo).map(d=>({d,diff:Math.ceil((new Date(d.jatuhTempo)-now)/(1000*60*60*24))})).filter(x=>x.diff<=7).sort((a,b)=>a.diff-b.diff);
+if(soonDebt.length){
+const x=soonDebt[0],late=x.diff<0;
+out.push({id:'debt-due-'+x.d.id,level:late?'danger':'warning',icon:late?'🔴':'🟠',text:`Utang "${escapeHtml(x.d.name)}" (${fmtFull(x.d.nilai)}) ${late?'sudah lewat '+Math.abs(x.diff)+' hari dari':x.diff===0?'jatuh tempo hari ini':x.diff+' hari lagi ke'} tanggal jatuh tempo.`});
+}
+}catch(e){console.warn('FinCoach: gagal cek utang',e);}
+// 7. Rata-rata surplus bulanan negatif (dipakai jg di FI) — sinyal dini progres Kebebasan Finansial mundur
+try{
+if(typeof fiMonthlySurplus==='function'&&D.transactions.length){
+const surplus=fiMonthlySurplus();
+if(surplus<0){
+out.push({id:'fi-surplus-neg',level:'warning',icon:'🟠',text:`Rata-rata surplus bulananmu negatif (${fmtFull(surplus)}) — kalau pola ini terus, progres Kebebasan Finansial bisa mundur.`});
+}
+}
+}catch(e){console.warn('FinCoach: gagal cek surplus FI',e);}
+// 8. Bisnis Shop (Cobek): margin profit bulan ini turun jauh (<=75%) dari bulan lalu, min. 3 transaksi biar tidak false-positive dari data sedikit
+try{
+const cobThis=D.cobek.filter(t=>{const d=new Date(t.date);return d.getMonth()===m&&d.getFullYear()===y;});
+const prevD=new Date(y,m-1,1);
+const cobPrev=D.cobek.filter(t=>{const d=new Date(t.date);return d.getMonth()===prevD.getMonth()&&d.getFullYear()===prevD.getFullYear();});
+const marginOf=rows=>{const omzet=rows.reduce((s,t)=>s+(t.total||0),0);const profit=rows.reduce((s,t)=>s+(t.profit||0),0);return omzet>0?profit/omzet:null;};
+const mThis=marginOf(cobThis),mPrev=marginOf(cobPrev);
+if(mThis!=null&&mPrev!=null&&mPrev>0&&mThis<mPrev*0.75&&cobThis.length>=3){
+out.push({id:'cobek-margin',level:'warning',icon:'🟠',text:`Margin profit Shop bulan ini turun ke ${Math.round(mThis*100)}% (bulan lalu ${Math.round(mPrev*100)}%) — cek lagi harga modal/jual produk terbaru.`,action:{label:'Lihat Shop',page:'cobek',navIdx:2}});
+}
+}catch(e){console.warn('FinCoach: gagal cek margin Shop',e);}
+// 9. Target tabungan yang hampir tercapai (90-99%) — penguat positif, bukan cuma peringatan melulu
+try{
+const near=(D.targets||[]).filter(t=>t.amount>0).map(t=>({t,pct:Math.round((t.saved/t.amount)*100)})).filter(x=>x.pct>=90&&x.pct<100).sort((a,b)=>b.pct-a.pct)[0];
+if(near){
+out.push({id:'target-near-'+near.t.id,level:'good',icon:'🟢',text:`Target "${escapeHtml(near.t.name)}" sudah ${near.pct}% — tinggal sedikit lagi tercapai! 🎉`});
+}
+}catch(e){console.warn('FinCoach: gagal cek target tabungan',e);}
+// Kalau tidak ada satupun sinyal bahaya/peringatan, kasih 1 insight positif biar widget tidak
+// kosong & user tetap tahu semua indikator utama aman (bukan cuma diam kalau memang aman).
+if(!out.some(o=>o.level==='danger'||o.level==='warning')&&inc>0){
+const rasio=Math.round(((inc-exp)/inc)*100);
+out.push({id:'all-good',level:'good',icon:'🟢',text:`Semua indikator utama aman bulan ini — surplus ${fmtFull(inc-exp)} (${rasio}% dari pemasukan). Pertahankan! 👍`});
+}
+const order={danger:0,warning:1,info:2,good:3};
+out.sort((a,b)=>order[a.level]-order[b.level]);
+return out;
+},
+dismissedIds(){
+try{return JSON.parse(localStorage.getItem(FinCoach.DISMISS_LS_KEY)||'[]');}catch(e){return[];}
+},
+dismiss(id){
+const cur=FinCoach.dismissedIds();
+if(!cur.includes(id))cur.push(id);
+try{localStorage.setItem(FinCoach.DISMISS_LS_KEY,JSON.stringify(cur.slice(-40)));}catch(e){}
+FinCoach.renderDash();
+},
+renderDash(){
+const card=document.getElementById('finCoachCard');
+if(!card)return;
+let insights;
+try{ insights=FinCoach.compute(); }catch(e){ console.warn('FinCoach: gagal hitung insight',e); insights=[]; }
+const dismissed=FinCoach.dismissedIds();
+insights=insights.filter(x=>!dismissed.includes(x.id));
+card.classList.remove('u-dnone');card.style.display='block';
+if(!insights.length){
+card.innerHTML=`<div class="card-title">🩺 AI Financial Coach <span class="card-collapse-toggle" id="finCoachCard-chev" data-action="toggleCardCollapse" data-args='["finCoachCard","$event"]' aria-label="Buka/tutup bagian">▾</span></div>
+    <div class="card-collapse-body" id="finCoachCard-cbody"><div class="u-fs12 u-t2 u-lh15">Belum cukup data buat cek insight otomatis. Catat transaksi rutin dulu ya, insight bakal muncul otomatis di sini.</div></div>`;
+applyOneCardCollapsePref('finCoachCard');
+return;
+}
+const top=insights.slice(0,4);
+const colFor={danger:'var(--accent2)',warning:'var(--accent4)',info:'var(--accent)',good:'var(--accent3)'};
+card.innerHTML=`<div class="card-title">🩺 AI Financial Coach <span class="acc-chip u-cacc2" style="border-color:var(--accent2)">${insights.length}</span> <span class="card-collapse-toggle" id="finCoachCard-chev" data-action="toggleCardCollapse" data-args='["finCoachCard","$event"]' aria-label="Buka/tutup bagian">▾</span></div>
+    <div class="card-collapse-body" id="finCoachCard-cbody">
+    <div class="u-fs11 u-t2 u-mb8 u-lh15">Insight otomatis dari data kamu sendiri — gratis, tanpa panggil AI, langsung dihitung tiap buka Beranda.</div>`
++top.map(x=>`
+      <div class="u-flex u-gap8 u-mb8" style="align-items:flex-start;border-left:3px solid ${colFor[x.level]};padding-left:8px">
+        <div class="u-flex1 u-fs12 u-lh15">${x.icon} ${x.text}${x.action?` <span class="u-cacc u-pointer u-fw700" data-action="showPage" data-args='["${x.action.page}","$nav:${x.action.navIdx}"]'>${escapeHtml(x.action.label)} →</span>`:''}</div>
+        <span class="u-fs11 u-pointer" style="color:var(--text3)" data-stop="1" data-action="FinCoach.dismiss" data-args="${escapeHtml(JSON.stringify([x.id]))}" title="Sembunyikan" aria-label="Sembunyikan">✕</span>
+      </div>`).join('')
++(insights.length>top.length?`<div class="u-fs12 u-cacc u-tar u-pointer" data-action="FinCoach.showAll">Lihat semua (${insights.length}) →</div>`:'')
++`</div>`;
+applyOneCardCollapsePref('finCoachCard');
+},
+showAll(){
+const insights=FinCoach.compute().filter(x=>!FinCoach.dismissedIds().includes(x.id));
+if(!insights.length){toast('✅ Tidak ada insight tersisa, semua sudah dicek!');return;}
+showAlertModal(insights.map(x=>x.icon+' '+x.text).join('\n\n'),{title:'🩺 Semua Insight Financial Coach',icon:'🩺'});
 }
 };
 const Kekayaan={

@@ -1970,18 +1970,23 @@ return {pass:true};
 }},
 {label:'RefAI.check()',id:'refAiModal',
 call:()=>{
+// BUGFIX: dulu pakai window.__sweepOrigFetch (global) buat simpan fetch asli -- kalau spec lain
+// (mis. RenovAI.suggest di bawah) jalan sebelum setTimeout 80ms ini selesai, __sweepOrigFetch
+// ketimpa nilai fetch PALSU milik spec itu, lalu ke-restore ke window.fetch sbg fetch palsu/undefined
+// SELAMANYA -- bikin semua fitur AI/web-search (Cek Referensi, Cek Harga Pasar, dst) rusak permanen
+// dgn error "fetch is not a function" sampai app di-reload. Fix: simpan fetch asli di variabel closure
+// LOKAL (origFetch), bukan properti global window, jadi tidak akan pernah ketimpa spec lain.
 const origFetch=window.fetch;
 window.fetch=()=>Promise.reject(new Error('__sweep_blocked_fetch__'));
-window.__sweepOrigFetch=origFetch;
-try{ RefAI.check(); } finally{ setTimeout(()=>{ window.fetch=window.__sweepOrigFetch; delete window.__sweepOrigFetch; },80); }
+try{ RefAI.check(); } finally{ setTimeout(()=>{ window.fetch=origFetch; },80); }
 }},
 {label:'RenovAI.suggest()',id:'renovAiModal',
 before:()=>{ D.renovProjects.push({id:'__sweep_dummy_project__',name:'(tes sweep)',items:[]}); return true; },
 call:()=>{
+// BUGFIX: sama seperti RefAI.check() di atas -- pakai closure lokal, bukan window.__sweepOrigFetch.
 const origFetch=window.fetch;
 window.fetch=()=>Promise.reject(new Error('__sweep_blocked_fetch__'));
-window.__sweepOrigFetch=origFetch;
-try{ RenovAI.suggest('__sweep_dummy_project__'); } finally{ setTimeout(()=>{ window.fetch=window.__sweepOrigFetch; delete window.__sweepOrigFetch; },80); }
+try{ RenovAI.suggest('__sweep_dummy_project__'); } finally{ setTimeout(()=>{ window.fetch=origFetch; },80); }
 },
 after:()=>{ D.renovProjects=D.renovProjects.filter(p=>p.id!=='__sweep_dummy_project__'); }},
 ];
@@ -2035,6 +2040,8 @@ call:()=>{ Tukang.openBorHistory(); }},
 call:()=>{ Tukang.openJamHistory(); }},
 {label:'EduFund.openModal()',id:'eduFundModal',
 call:()=>{ EduFund.openModal(); }},
+{label:'Refleksi.open()',id:'refleksiModal',
+call:()=>{ Refleksi.open(); }},
 ];
 function computeModalSweepCoverageResults(){
 const allIds=Array.from(document.querySelectorAll('.overlay,.qs-modal-overlay,.calc-overlay'))

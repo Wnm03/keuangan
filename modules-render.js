@@ -1,7 +1,7 @@
 // Fungsi render (85 fungsi) dipisah dari app_production.html untuk pemerataan ukuran file.
 // Semua fungsi ini murni definisi function global (bukan module), jadi tetap bisa dipanggil dari file manapun
 // yang loadnya belakangan (sama seperti modules-calc.js/features-*.js).
-const MODULE_RENDER_VERSION='kw70-tukang-riwayat-absensi-18';
+const MODULE_RENDER_VERSION='kw78-fincoach-proaktif';
 
 function renderPageContent(name){
 if(name==='dashboard')renderDashboard();
@@ -252,6 +252,8 @@ const pct=Math.round((sudah/b.tenor)*100);
 cicilanBar=`<div class="u-mt4"><div class="u-flex u-jcb u-fs12 u-t2 u-mb2"><span>Cicilan ke-${sudah} dari ${b.tenor}x</span><span>${pct}%</span></div><div class="prog-bar" style="height:4px"><div class="prog-fill purple" style="width:${pct}%"></div></div></div>`;
 }
 const statusBadge=b._lunas?`<span class="bill-due-badge bill-due-ok">✅ Lunas</span>`:`<span class="bill-due-badge ${soon?'bill-due-soon':'bill-due-ok'}">${diff<0?'Lewat':diff===0?'Hari ini':diff+' hari'}</span>`;
+const anomaly=b._lunas?null:getBillAnomalyInfo(b.id,b.amount);
+const anomalyNote=anomaly?`<div class="u-fs11 u-mt2 u-fw700" style="color:var(--accent4)">⚠️ Naik ${anomaly.pctChange}% dari rata-rata ${anomaly.count}x terakhir (${fmt(anomaly.avgPrev)}) — cek lagi sebelum bayar</div>`:'';
 const actionBtns=b._lunas?
 `<button class="tx-del u-cacc3" data-action="openBillHistory" data-args="${escapeHtml(JSON.stringify([b.id]))}" title="Riwayat Pembayaran" aria-label="Riwayat Pembayaran">📋</button>`:
 `<button class="tx-del" data-action="markBillPaid" data-args="${escapeHtml(JSON.stringify([b.id]))}" title="Bayar sekarang" aria-label="Bayar sekarang">✅</button>
@@ -269,6 +271,7 @@ return`<div class="bill-item" style="flex-direction:column;align-items:stretch;g
         </div>
       </div>
       ${cicilanBar}
+      ${anomalyNote}
       <div class="u-flex u-gap6 u-fwrap" style="justify-content:flex-end">
         ${actionBtns}
       </div>
@@ -438,6 +441,7 @@ const vehicles=dashServisVehFilter==='semua'?D.vehicles:D.vehicles.filter(v=>v.i
 const rows=[];
 vehicles.forEach(veh=>{
 const curKm=getVehicleKm(veh.id);
+const kmPerDay=estimateKmPerDay(veh.id);
 D.sparepartCats.forEach(cat=>{
 const lastKm=getLastServiceKmForCat(veh.id,cat);
 const intervalKm=getEffectiveIntervalKm(veh.id,cat);
@@ -449,7 +453,9 @@ if(sisa<=0)col='red';
 else if(sisa<=intervalKm*0.15)col='orange';
 if(!col)return;
 const msg=sisa<=0?`⚠️ Lewat ${Math.abs(sisa).toLocaleString('id-ID')} km`:`🔔 Sisa ${sisa.toLocaleString('id-ID')} km`;
-rows.push({veh,cat,sisa,pct,col,msg});
+const estDateISO=estimateServiceDateISO(sisa,kmPerDay);
+const estLabel=estDateISO?` · ~${fmtDateID(estDateISO)}`:'';
+rows.push({veh,cat,sisa,pct,col,msg:msg+estLabel});
 });
 });
 if(!rows.length){
@@ -537,6 +543,7 @@ toast('Oke, tidak akan diingatkan lagi. Kamu tetap bisa aktifkan backup kapan sa
 
 function renderDashboard(){
 LifeBalance.render();
+if(typeof FinCoach!=='undefined')FinCoach.renderDash();
 if(typeof AIWidget!=='undefined')AIWidget.render();
 const now=new Date(),m=now.getMonth(),y=now.getFullYear();
 const txM=D.transactions.filter(t=>{const d=new Date(t.date);return d.getMonth()===m&&d.getFullYear()===y;});
@@ -738,12 +745,12 @@ if(!lapMoreWrap){
 lapMoreWrap=document.createElement('div');
 lapMoreWrap.id='lapTxLoadMoreWrap';
 lapMoreWrap.style.cssText='text-align:center;margin-top:10px';
-lapMoreWrap.innerHTML='<button class="btn btn-ghost btn-sm" data-action="loadMoreLapTx"></button>';
+lapMoreWrap.innerHTML='<button class="btn btn-ghost btn-sm" data-action="loadMoreLapTx" aria-label="Tampilkan lebih banyak transaksi"></button>';
 document.getElementById('lapTx').insertAdjacentElement('afterend',lapMoreWrap);
 }
 if(visibleCount<sorted.length){
 lapMoreWrap.style.display='block';
-lapMoreWrap.querySelector('button').textContent=`⬇️ Tampilkan lebih banyak (${sorted.length-visibleCount} lagi)`;
+{const lapMoreBtn=lapMoreWrap.querySelector('button');const lapMoreLabel=`⬇️ Tampilkan lebih banyak (${sorted.length-visibleCount} lagi)`;lapMoreBtn.textContent=lapMoreLabel;lapMoreBtn.setAttribute('aria-label',lapMoreLabel);}
 } else lapMoreWrap.style.display='none';
 }
 

@@ -2,7 +2,7 @@
 // PENTING: file ini HARUS dimuat sesuai urutan build.js (GROUP_A/GROUP_B) karena beberapa modul saling referensi. Urutan grup ini: pajak-pbb-zakat.js, features-budget-laporan-carnotes-pelanggan.js, edukasi-dana.js, sewakios.js, hidup-seimbang.js, linktx.js, renovasi.js, aset.js, worthit.js
 // CATATAN: MODULE_FEATURES_VERSION, VEHTAX_INPUT_IDS, MY_WRENCH, CHAT_ACTION_LABELS DIPINDAH ke sini dari features-etalase-piutang-renovai.js (file itu dihapus, sisa 3 konstanta kecilnya sudah tidak punya file sendiri lagi — semua ditaruh dekat kode yang benar-benar memakainya di domain ini: VEHTAX_INPUT_IDS dekat VEHTAX_ITEMS, MY_WRENCH dekat modul Torsi, CHAT_ACTION_LABELS dekat CHAT_ACTION_HANDLERS/CHAT_ACTION_EDIT_FIELDS).
 
-const MODULE_FEATURES_VERSION='kw70-tukang-riwayat-absensi-18';
+const MODULE_FEATURES_VERSION='kw78-fincoach-proaktif';
 const Budget={
 editId:null,
 curIcon:'🍚',
@@ -968,6 +968,7 @@ renderReminder(){
 const card=document.getElementById('servisReminderCard');
 if(!card)return;
 const curKm=getVehicleKm(curVehicleId);
+const kmPerDay=estimateKmPerDay(curVehicleId);
 if(!D.sparepartCats.length){card.innerHTML='<div class="card-title">🔔 Pengingat Servis</div><div class="empty"><div class="empty-text">Belum ada kategori sparepart. Atur di Pengaturan.</div></div>';return;}
 const rows=D.sparepartCats.map(cat=>{
 const lastKm=Servis.getLastServiceKmForCat(curVehicleId,cat);
@@ -979,13 +980,15 @@ const pct=Math.min(100,Math.max(0,Math.round((jarakTempuh/intervalKm)*100)));
 let col='green',msg=`Sisa ${sisa.toLocaleString('id-ID')} km`;
 if(sisa<=0){col='red';msg=`⚠️ Lewat ${Math.abs(sisa).toLocaleString('id-ID')} km`;}
 else if(sisa<=intervalKm*0.15){col='orange';msg=`🔔 Sisa ${sisa.toLocaleString('id-ID')} km`;}
-return{cat,lastKm,intervalKm,overridden,sisa,pct,col,msg};
+const estDateISO=estimateServiceDateISO(sisa,kmPerDay);
+const estLabel=estDateISO?` · ~${fmtDateID(estDateISO)}`:'';
+return{cat,lastKm,intervalKm,overridden,sisa,pct,col,msg,estLabel};
 }).sort((a,b)=>a.sisa-b.sisa);
-card.innerHTML=`<div class="card-title">🔔 Pengingat Servis per Part <span class="card-collapse-toggle" id="servisReminderCard-chev" data-action="toggleCardCollapse" data-args='["servisReminderCard","$event"]' aria-label="Buka/tutup bagian">▾</span></div><div class="card-collapse-body" id="servisReminderCard-cbody">`+rows.map(r=>`
+card.innerHTML=`<div class="card-title">🔔 Pengingat Servis per Part <span class="card-collapse-toggle" id="servisReminderCard-chev" data-action="toggleCardCollapse" data-args='["servisReminderCard","$event"]' aria-label="Buka/tutup bagian">▾</span></div><div class="card-collapse-body" id="servisReminderCard-cbody">`+(kmPerDay?`<div class="u-fs11 u-t2 u-mb10">📊 Estimasi tanggal dihitung dari rata-rata pemakaian ~${kmPerDay.toFixed(1)} km/hari (histori Catatan KM & BBM).</div>`:'')+rows.map(r=>`
       <div class="u-mb12">
         <div class="u-flex u-jcb u-aic u-fs12 u-mb4 u-pointer" data-action="editSparepartFromReminder" data-args="${escapeHtml(JSON.stringify([r.cat.id]))}" title="Tap untuk edit kategori (berlaku semua kendaraan)">
           <span class="u-fw700">${escapeHtml(r.cat.name)} <span class="u-fs11 u-t2">✏️</span></span>
-          <span class="${r.col} u-fw700">${r.msg}</span>
+          <span class="${r.col} u-fw700">${r.msg}${r.estLabel}</span>
         </div>
         <div class="prog-bar"><div class="prog-fill ${r.col}" style="width:${r.pct}%"></div></div>
         <div class="u-flex u-jcb u-aic" style="margin-top:3px">

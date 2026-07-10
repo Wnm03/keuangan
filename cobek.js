@@ -1,4 +1,6 @@
-// cobek.js — Domain Cobek: etalase/stok produk, produsen, order pelanggan, laporan omzet, data pelanggan.
+// cobek.js — Domain Cobek: etalase/stok produk, produsen, order pelanggan, laporan omzet, data pelanggan,
+// widget dashboard "🤖 Rekomendasi Harga Jual AI" (PriceRekoWidget, kw73) & "📦 Rekomendasi Restock AI"
+// (StockRekoWidget, kw74) — keduanya rule-based, tanpa panggil AI/web search.
 // Dipisah dari: features-etalase-piutang-renovai.js, features-renovasi-pajak-aset-order.js,
 // features-budget-laporan-carnotes-pelanggan.js, features-gaji-cobek-tagihan.js (kini transaksi.js),
 // features-aiwidget-reminder-gdrive-search.js, backup-restore.js, modules-render.js
@@ -206,27 +208,14 @@ const sysPrompt=`Kamu asisten riset harga pasar Indonesia. Cari kisaran HARGA JU
 {"hargaPasar":{"min": <angka Rp, atau null kalau tidak ketemu>, "max": <angka Rp, atau null>, "source":"<sumber & rincian singkat>"}}
 Kalau tidak ketemu/tidak yakin, isi min & max dengan null dan jelaskan di source. JANGAN mengarang angka.`;
 try{
-let textOut;
-if(provider==='gemini'){
-const url=`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(apiKey)}`;
-const res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
-system_instruction:{parts:[{text:sysPrompt}]},
-contents:[{role:'user',parts:[{text:'Cari kisaran harga jual pasar sesuai format JSON yang diminta.'}]}],
-tools:[{google_search:{}}],generationConfig:{maxOutputTokens:1024}
-})});
-const data=await res.json();
-if(!res.ok){toast('❌ Gagal hubungi Gemini: '+(data?.error?.message||`HTTP ${res.status}`));if(info)info.textContent='';return;}
-textOut=(data.candidates?.[0]?.content?.parts||[]).filter(p=>p.text).map(p=>p.text).join('\n').trim();
-}else{
-const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({
-model:'claude-sonnet-4-6',max_tokens:1000,system:sysPrompt,
-messages:[{role:'user',content:'Cari kisaran harga jual pasar sesuai format JSON yang diminta.'}],
-tools:[{type:'web_search_20250305',name:'web_search'}]
-})});
-const data=await res.json();
-if(!res.ok){toast('❌ Gagal hubungi Claude: '+(data?.error?.message||`HTTP ${res.status}`));if(info)info.textContent='';return;}
-textOut=(data.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('\n').trim();
+const r=await callAIProviderRaw(sysPrompt,[{role:'user',content:'Cari kisaran harga jual pasar sesuai format JSON yang diminta.'}],{maxTokens:1024,webSearch:true});
+if(!r.ok){
+const label=provider==='gemini'?'Gemini':'Claude';
+toast('❌ Gagal hubungi '+label+': '+(r.errMsg||'error tidak diketahui'));
+if(info)info.textContent='';
+return;
 }
+const textOut=r.text;
 const parsed=RefAI._parseJSON(textOut);
 const item=parsed&&parsed.hargaPasar;
 if(!item||item.min===null||item.min===undefined||!isFinite(Number(item.min))||Number(item.min)<=0){
@@ -253,6 +242,153 @@ const resellerMargin=marginPct*0.6;
 resellerEl.value=this.roundNice((modal+transport)*(1+resellerMargin/100));
 }
 toast('✅ Harga Jual (& Reseller kalau kosong) terisi dari rekomendasi');
+}
+};
+// PriceRekoWidget — widget dashboard "🤖 Rekomendasi Harga Jual AI" di tab Etalase (kartu di atas
+// daftar produk). Beda dari PriceReko di atas (yang manual, per-produk, di dalam productModal):
+// widget ini SCAN OTOMATIS semua produk yang sudah punya Harga Beli & Harga Jual, bandingkan Harga
+// Jual sekarang dengan estimasi rule-based (margin rata-rata produk sejenis sekategori + rata-rata
+// biaya transport dari BBM terakhir — formula sama seperti PriceReko.calc), lalu tandai produk yang
+// harganya menyimpang >=THRESHOLD_PCT dari estimasi (kemahalan ATAU kemurahan).
+// SENGAJA TIDAK memanggil AI/web search (gratis & instan, jalan tiap render tanpa kuota/API key) —
+// kalau mau verifikasi ke harga pasar sungguhan, tombol "🔍" di tiap baris membuka productModal
+// produk itu & otomatis buka panel PriceReko yang sudah ada, tinggal tap "🔍 Cek Harga Pasar via AI".
+const PriceRekoWidget={
+THRESHOLD_PCT:15,
+avgTransport(){
+const recent=(D.bbmLogs||[]).filter(b=>b.liter>0&&b.harga>0).slice(-10);
+if(!recent.length)return 0;
+return recent.reduce((s,b)=>s+b.harga,0)/recent.length;
+},
+avgMarginForKategori(kategoriId,excludeId){
+const sejenis=(D.products||[]).filter(p=>p.kategoriId===kategoriId&&p.id!==excludeId&&p.hargaBeli>0&&p.hargaJual>0);
+if(!sejenis.length)return 50;
+const margins=sejenis.map(p=>((p.hargaJual-p.hargaBeli)/p.hargaBeli)*100).filter(m=>isFinite(m)&&m>0);
+if(!margins.length)return 50;
+return margins.reduce((a,b)=>a+b,0)/margins.length;
+},
+recommend(p){
+const transport=this.avgTransport();
+const marginPct=this.avgMarginForKategori(p.kategoriId,p.id);
+const base=(p.hargaBeli||0)+transport;
+return PriceReko.roundNice(base*(1+marginPct/100));
+},
+scan(){
+return(D.products||[]).filter(p=>p.hargaBeli>0&&p.hargaJual>0).map(p=>{
+const reko=this.recommend(p);
+const diffPct=reko>0?((p.hargaJual-reko)/reko)*100:0;
+return{product:p,reko,diffPct};
+}).filter(x=>x.reko>0&&Math.abs(x.diffPct)>=this.THRESHOLD_PCT)
+.sort((a,b)=>Math.abs(b.diffPct)-Math.abs(a.diffPct));
+},
+render(){
+const card=document.getElementById('priceRekoWidgetCard');
+const list=document.getElementById('priceRekoWidgetList');
+if(!card||!list)return;
+const flagged=this.scan();
+if(!flagged.length){card.style.display='none';list.innerHTML='';return;}
+card.style.display='';
+list.innerHTML=flagged.map(({product,reko,diffPct})=>{
+const under=diffPct<0;
+const badgeColor=under?'var(--accent2)':'var(--accent4)';
+const badgeText=under?`⬇️ ${Math.abs(Math.round(diffPct))}% di bawah estimasi`:`⬆️ ${Math.round(diffPct)}% di atas estimasi`;
+return`<div class="tx-item">
+        <div class="tx-icon u-bgaccsoft">🪨</div>
+        <div class="tx-info"><div class="tx-name">${escapeHtml(product.name)}</div>
+          <div class="tx-meta">Sekarang ${fmt(product.hargaJual)} → Estimasi ${fmt(reko)}</div>
+          <div class="tx-meta u-mt2" style="color:${badgeColor};font-weight:700">${badgeText}</div>
+        </div>
+        <button class="tx-del u-bgaccsoft u-cacc" style="margin-right:6px" data-action="applyPriceRekoWidgetOne" data-args="${escapeHtml(JSON.stringify([product.id]))}" aria-label="Terapkan">✅</button>
+        <button class="tx-del" data-action="openPriceRekoWidgetDetail" data-args="${escapeHtml(JSON.stringify([product.id]))}" aria-label="Detail">🔍</button>
+      </div>`;
+}).join('');
+},
+async applyOne(productId){
+const idx=(D.products||[]).findIndex(p=>p.id===productId);
+if(idx<0)return;
+const p=D.products[idx];
+const reko=this.recommend(p);
+if(!reko){toast('⚠️ Tidak bisa hitung estimasi (isi dulu Harga Beli)');return;}
+if(!await askConfirm(`Ubah Harga Jual "${p.name}" dari ${fmt(p.hargaJual)} jadi ${fmt(reko)}?`))return;
+p.hargaJual=reko;
+save();this.render();renderProductList();
+toast(`✅ Harga Jual "${p.name}" diperbarui ke ${fmtFull(reko)}`);
+},
+openDetail(productId){
+const idx=(D.products||[]).findIndex(p=>p.id===productId);
+if(idx<0)return;
+Etalase.openModal(idx);
+// otomatis buka panel "Rekomendasi Harga Jual" yg sudah ada di productModal, biar tinggal tap
+// "🔍 Cek Harga Pasar via AI" tanpa perlu cari-cari tombolnya lagi
+setTimeout(()=>{const panel=document.getElementById('priceRekoPanel');if(panel&&panel.classList.contains('u-dnone'))PriceReko.toggle();},50);
+}
+};
+// StockRekoWidget — widget dashboard "📦 Rekomendasi Restock AI" di tab Etalase, di bawah
+// PriceRekoWidget. Sama-sama rule-based & gratis (tanpa panggil AI/web search): hitung kecepatan
+// jual tiap produk dari histori Penjualan Shop (D.cobek, LOOKBACK_DAYS terakhir), lalu bandingkan
+// sisa stok dgn kecepatan itu buat estimasi "berapa hari lagi stok habis" & "berapa unit perlu
+// ditambah supaya cukup utk COVER_DAYS ke depan". Produk tanpa histori penjualan tapi stoknya sudah
+// ≤2 tetap ditandai (mode "belum cukup data") supaya tidak lolos dari perhatian.
+const StockRekoWidget={
+LOOKBACK_DAYS:30,
+COVER_DAYS:30,
+URGENT_DAYS:14,
+soldQty(productId,days){
+const since=new Date();since.setDate(since.getDate()-days);
+let qty=0;
+(D.cobek||[]).forEach(c=>{
+if(!c.items)return;
+const d=new Date(c.date);
+if(isNaN(d)||d<since)return;
+c.items.forEach(it=>{if(it.productId===productId)qty+=(it.qty||0);});
+});
+return qty;
+},
+scan(){
+return(D.products||[]).map(p=>{
+const stock=p.stock||0;
+const sold=this.soldQty(p.id,this.LOOKBACK_DAYS);
+const velocity=sold/this.LOOKBACK_DAYS;
+const hasHistory=sold>0;
+const daysLeft=hasHistory?stock/velocity:(stock<=2?0:Infinity);
+const restockQty=hasHistory?Math.max(0,Math.ceil(velocity*this.COVER_DAYS-stock)):(stock<=2?5:0);
+return{product:p,sold,velocity,hasHistory,daysLeft,restockQty};
+}).filter(x=>x.daysLeft<=this.URGENT_DAYS&&(x.hasHistory||x.product.stock<=2))
+.sort((a,b)=>a.daysLeft-b.daysLeft);
+},
+render(){
+const card=document.getElementById('stockRekoWidgetCard');
+const list=document.getElementById('stockRekoWidgetList');
+if(!card||!list)return;
+const flagged=this.scan();
+if(!flagged.length){card.style.display='none';list.innerHTML='';return;}
+card.style.display='';
+list.innerHTML=flagged.map(({product,hasHistory,velocity,daysLeft,restockQty})=>{
+const badgeText=hasHistory
+?`⏳ Estimasi ~${Math.max(0,Math.round(daysLeft))} hari lagi habis (rata-rata jual ${(velocity*7).toFixed(1)}/minggu)`
+:'⚠️ Stok menipis, belum cukup data histori penjualan';
+return`<div class="tx-item">
+        <div class="tx-icon u-bgaccsoft">📦</div>
+        <div class="tx-info"><div class="tx-name">${escapeHtml(product.name)}</div>
+          <div class="tx-meta">Sisa stok: ${product.stock||0}${restockQty>0?` · Saran tambah ${restockQty} unit`:''}</div>
+          <div class="tx-meta u-mt2" style="color:var(--accent2);font-weight:700">${badgeText}</div>
+        </div>
+        <button class="tx-del" data-action="openStockRekoWidgetDetail" data-args="${escapeHtml(JSON.stringify([product.id,restockQty]))}" aria-label="Detail">🔍</button>
+      </div>`;
+}).join('');
+},
+openDetail(productId,restockQty){
+const idx=(D.products||[]).findIndex(p=>p.id===productId);
+if(idx<0)return;
+Etalase.openModal(idx);
+// prefill kolom Stok dgn saran stok baru (stok sekarang + restockQty), user tetap pilih akun &
+// bisa ubah angkanya sendiri sebelum simpan (sama seperti nambah stok manual biasa)
+if(restockQty>0){
+setTimeout(()=>{
+const stockEl=document.getElementById('pStock');
+if(stockEl)stockEl.value=(D.products[idx].stock||0)+restockQty;
+},50);
+}
 }
 };
 const Produsen={
@@ -1029,6 +1165,9 @@ function openProductModal(idx){return Etalase.openModal(idx);}
 function onPProdusenChange(){return Etalase.onProdusenChange();}
 function saveProduct(){return Etalase.save();}
 function delProduct(i){return Etalase.delete(i);}
+function applyPriceRekoWidgetOne(id){return PriceRekoWidget.applyOne(id);}
+function openPriceRekoWidgetDetail(id){return PriceRekoWidget.openDetail(id);}
+function openStockRekoWidgetDetail(id,restockQty){return StockRekoWidget.openDetail(id,restockQty);}
 /* moved to modules-render.js: renderProductList */
 function setCobekTab(t,el){
 document.querySelectorAll('#page-cobek .cn-tab').forEach(b=>b.classList.remove('active'));
@@ -1104,7 +1243,7 @@ el.innerHTML=lines.map((l,i)=>`
     </div>`).join('')+`<div class="u-fs12 u-t2 u-mt2 u-tar">Subtotal: ${fmtFull(total)} · Estimasi untung: ${fmtFull(profit)}</div>`;
 }
 
-function renderProductList(){return Etalase.renderList();}
+function renderProductList(){Etalase.renderList();PriceRekoWidget.render();StockRekoWidget.render();}
 
 function renderProdusenList(){return Produsen.renderList();}
 

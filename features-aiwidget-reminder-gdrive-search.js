@@ -342,46 +342,16 @@ return;
 }
 try{
 let reply;
-if(provider==='gemini'){
-const geminiContents=D.chatHistory.slice(-10).map(m=>({role:m.role==='assistant'?'model':'user',parts:[{text:m.content}]}));
-const url=`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(apiKey)}`;
-const res=await fetch(url,{
-method:'POST',
-headers:{'Content-Type':'application/json'},
-body:JSON.stringify({system_instruction:{parts:[{text:systemPrompt}]},contents:geminiContents,generationConfig:{maxOutputTokens:4096}})
-});
-const data=await res.json();
-if(!res.ok){
-const errMsg=data?.error?.message||`HTTP ${res.status}`;
+const r=await callAIProviderRaw(systemPrompt,D.chatHistory.slice(-10));
+if(!r.ok){
+const label=provider==='gemini'?'Gemini':'Claude';
 loading.remove();
-box.innerHTML+=`<div class="chat-bubble ai">⚠️ Gagal hubungi Gemini: ${escapeHtml(errMsg)}${res.status===400||res.status===403?' (cek API key di Pengaturan)':''}</div>`;
+box.innerHTML+=`<div class="chat-bubble ai">⚠️ Gagal hubungi ${label}: ${escapeHtml(r.errMsg||'error tidak diketahui')}${aiErrorHint(provider,r.status)}</div>`;
 D.chatHistory.pop();
 box.scrollTop=box.scrollHeight;
 return;
 }
-reply=data.candidates?.[0]?.content?.parts?.map(p=>p.text).join('')||'Maaf, coba lagi ya W!';
-} else {
-const res=await fetch('https://api.anthropic.com/v1/messages',{
-method:'POST',
-headers:{
-'Content-Type':'application/json',
-'x-api-key':apiKey,
-'anthropic-version':'2023-06-01',
-'anthropic-dangerous-direct-browser-access':'true'
-},
-body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:4096,system:systemPrompt,messages:D.chatHistory.slice(-10)})
-});
-const data=await res.json();
-if(!res.ok){
-const errMsg=data?.error?.message||`HTTP ${res.status}`;
-loading.remove();
-box.innerHTML+=`<div class="chat-bubble ai">⚠️ Gagal hubungi Claude: ${escapeHtml(errMsg)}${res.status===401?' (API key salah/expired, cek di Pengaturan)':''}</div>`;
-D.chatHistory.pop();
-box.scrollTop=box.scrollHeight;
-return;
-}
-reply=data.content?.[0]?.text||'Maaf, coba lagi ya W!';
-}
+reply=r.text||'Maaf, coba lagi ya W!';
 const{text:cleanText,action,actionError}=extractChatAction(reply);
 D.chatHistory.push({role:'assistant',content:cleanText||reply});
 save();
@@ -415,29 +385,55 @@ D.chatHistory.pop();
 }
 box.scrollTop=box.scrollHeight;
 }
-async function callAIProviderRaw(systemPrompt,messages){
+// callAIProviderRaw — SATU-SATUNYA tempat yang benar-benar fetch() ke Claude/Gemini di seluruh
+// app. Awalnya cuma dipakai AIWidget.generate(), sekarang jadi tempat bersama utk 6 fitur AI yang
+// ada (chat asisten, AIWidget laporan, RenovAI, RefAI, PriceReko.checkMarketAI, EduFund.checkAI) —
+// sebelumnya tiap fitur itu copy-paste sendiri kode fetch Claude+Gemini (6x kode yang HAMPIR SAMA
+// PERSIS, cuma beda systemPrompt/messages/maxTokens/perlu web_search atau tidak). Dirapikan supaya
+// nambah provider AI baru, ganti model, atau benerin bug fetch cukup di 1 tempat.
+// opts (semua opsional): {maxTokens:number (default 4096), webSearch:boolean (default false, aktifkan
+// tool pencarian web server-side — Gemini google_search / Claude web_search_20250305, dipakai
+// fitur yang butuh info TERBARU spt harga emas/harga pasar/biaya sekolah, BUKAN utk chat/saran biasa)}
+// Return: {ok:true,text} kalau sukses (text = gabungan SEMUA blok teks di balasan, bukan cuma blok
+// pertama — penting utk balasan yang pakai web_search, karena balasannya bisa berisi beberapa blok
+// teks diselingi hasil pencarian, bukan cuma 1 blok di awal), atau {ok:false,errMsg,status} kalau
+// gagal (status = HTTP status code kalau ada, dipakai caller utk kasih hint spesifik spt "cek API key").
+async function callAIProviderRaw(systemPrompt,messages,opts){
 const apiKey=D.profile.apiKey;
 const provider=D.profile.apiProvider||'claude';
 if(!apiKey)return{ok:false,errMsg:'no_api_key'};
+const maxTokens=(opts&&opts.maxTokens)||4096;
+const useWebSearch=!!(opts&&opts.webSearch);
 try{
 if(provider==='gemini'){
 const geminiContents=messages.map(m=>({role:m.role==='assistant'?'model':'user',parts:[{text:m.content}]}));
+const body={system_instruction:{parts:[{text:systemPrompt}]},contents:geminiContents,generationConfig:{maxOutputTokens:maxTokens}};
+if(useWebSearch)body.tools=[{google_search:{}}];
 const url=`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(apiKey)}`;
-const res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({system_instruction:{parts:[{text:systemPrompt}]},contents:geminiContents,generationConfig:{maxOutputTokens:4096}})});
+const res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
 const data=await res.json();
-if(!res.ok)return{ok:false,errMsg:data?.error?.message||`HTTP ${res.status}`};
-const text=data.candidates?.[0]?.content?.parts?.map(p=>p.text).join('')||'';
+if(!res.ok)return{ok:false,errMsg:data?.error?.message||`HTTP ${res.status}`,status:res.status};
+const text=(data.candidates?.[0]?.content?.parts||[]).filter(p=>p.text).map(p=>p.text).join('\n').trim();
 return{ok:true,text};
 } else {
-const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:4096,system:systemPrompt,messages})});
+const body={model:'claude-sonnet-4-6',max_tokens:maxTokens,system:systemPrompt,messages};
+if(useWebSearch)body.tools=[{type:'web_search_20250305',name:'web_search'}];
+const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify(body)});
 const data=await res.json();
-if(!res.ok)return{ok:false,errMsg:data?.error?.message||`HTTP ${res.status}`};
-const text=data.content?.[0]?.text||'';
+if(!res.ok)return{ok:false,errMsg:data?.error?.message||`HTTP ${res.status}`,status:res.status};
+const text=(data.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('\n').trim();
 return{ok:true,text};
 }
 }catch(e){
 return{ok:false,errMsg:e.message||'koneksi bermasalah'};
 }
+}
+// authHint — dipakai caller (chat, RefAI, PriceReko, EduFund) utk kasih saran singkat spesifik
+// per status HTTP, ngikutin pesan yang dulu ditulis manual & beda2 dikit di tiap fitur (skrg disatukan
+// di 1 fungsi supaya konsisten): Claude 401 = API key salah/expired, Gemini 400/403 = cek API key.
+function aiErrorHint(provider,status){
+if(provider==='gemini')return(status===400||status===403)?' (cek API key di Pengaturan)':'';
+return status===401?' (API key salah/expired, cek di Pengaturan)':'';
 }
 const AIWidget={
 generating:false,

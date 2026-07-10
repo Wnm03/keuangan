@@ -983,6 +983,30 @@ const kms=[
 ];
 return kms.length?Math.max(...kms):0;
 }
+// estimateKmPerDay/estimateServiceDateISO — dipakai Servis.renderReminder() &
+// renderDashboardServisReminder() utk "Rekomendasi Servis AI": selain "sisa X km" (yang sudah ada),
+// tambahkan ESTIMASI TANGGAL servis berikutnya dari rata-rata pemakaian km/hari kendaraan itu
+// (dihitung dari histori D.kmLogs + D.bbmLogs — keduanya sudah punya {date,km} per kendaraan).
+// Rule-based & gratis (bukan panggilan AI/web search) — kalau histori kurang (data <2 titik, atau
+// rentang tanggalnya <3 hari, atau km tidak pernah naik), balikin null & UI cukup tampilkan "sisa km"
+// spt biasa tanpa estimasi tanggal.
+function estimateKmPerDay(vehicleId){
+const points=[
+...D.kmLogs.filter(k=>k.vehicleId===vehicleId&&k.date&&isFinite(k.km)).map(k=>({date:k.date,km:k.km})),
+...D.bbmLogs.filter(b=>b.vehicleId===vehicleId&&b.date&&isFinite(b.km)&&b.km>0).map(b=>({date:b.date,km:b.km}))
+].sort((a,b)=>new Date(a.date)-new Date(b.date));
+if(points.length<2)return null;
+const first=points[0],last=points[points.length-1];
+const days=(new Date(last.date)-new Date(first.date))/86400000;
+const kmDiff=last.km-first.km;
+if(days<3||kmDiff<=0)return null;
+return kmDiff/days;
+}
+function estimateServiceDateISO(sisaKm,kmPerDay){
+if(!kmPerDay||kmPerDay<=0||sisaKm===null||sisaKm===undefined||sisaKm<=0)return null;
+const d=new Date();d.setHours(0,0,0,0);d.setDate(d.getDate()+Math.ceil(sisaKm/kmPerDay));
+return dateToISO(d);
+}
 function servisLogMatchesCat(s,cat){
 if(s.categoryId) return s.categoryId===cat.id;
 const cn=cat.name.toLowerCase();

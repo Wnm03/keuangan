@@ -409,6 +409,25 @@ const mt=document.getElementById(prefix+'MonthTotal'); if(mt)mt.textContent=fmt(
 const sc=document.getElementById(prefix+'SoonCount'); if(sc)sc.textContent=s.soonCount;
 const os=document.getElementById(prefix+'Outstanding'); if(os)os.textContent=fmt(s.outstanding);
 }
+// getBillAnomalyInfo — dipakai renderBillList() utk kasih badge peringatan "⚠️ Naik X% dari
+// biasanya" di tagihan yang nominal terbarunya (b.amount, dipakai sbg preset saat markBillPaid())
+// jauh lebih tinggi dari rata-rata histori pembayaran asli (D.transactions dgn billLinkId===b.id).
+// Berguna utk tagihan yang nominalnya memang berubah tiap periode (listrik/pulsa/langganan naik
+// harga), beda dari cicilan yang biasanya fix — bisa nunjukin salah catat ATAU tarif beneran naik,
+// keduanya sama-sama layak dicek user sebelum bayar. Butuh minimal 2 histori pembayaran biar tidak
+// false-positive dari kebetulan/variasi normal (baru 1x pembayaran belum ada "biasanya" yg valid).
+// Rule-based & gratis (bukan panggilan AI), threshold 25% kenaikan dianggap "signifikan".
+const BILL_ANOMALY_THRESHOLD_PCT=25;
+function getBillAnomalyInfo(billId,currentAmount){
+if(!currentAmount||currentAmount<=0)return null;
+const history=D.transactions.filter(t=>t.billLinkId===billId).sort((a,b)=>new Date(b.date)-new Date(a.date)).slice(0,3);
+if(history.length<2)return null;
+const avgPrev=history.reduce((s,t)=>s+t.amount,0)/history.length;
+if(avgPrev<=0)return null;
+const pctChange=Math.round(((currentAmount-avgPrev)/avgPrev)*100);
+if(pctChange<BILL_ANOMALY_THRESHOLD_PCT)return null;
+return{avgPrev,pctChange,count:history.length};
+}
 /* moved to modules-render.js: renderDashboardBills */
 function checkBills(){
 const banner=document.getElementById('billBanner');
