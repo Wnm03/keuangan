@@ -1,5 +1,5 @@
 
-const MODULE_CALC_VERSION='kw70-split-backup-restore-rename';
+const MODULE_CALC_VERSION='kw70-a11y-cat-toggle-arialabel';
 const FI={
 assetScopeState:'zakatable',
 investmentAssetValue(){

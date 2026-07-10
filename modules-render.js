@@ -1,7 +1,7 @@
 // Fungsi render (85 fungsi) dipisah dari app_production.html untuk pemerataan ukuran file.
 // Semua fungsi ini murni definisi function global (bukan module), jadi tetap bisa dipanggil dari file manapun
 // yang loadnya belakangan (sama seperti modules-calc.js/features-*.js).
-const MODULE_RENDER_VERSION='kw70-split-backup-restore-rename';
+const MODULE_RENDER_VERSION='kw70-a11y-cat-toggle-arialabel';
 
 function renderPageContent(name){
 if(name==='dashboard')renderDashboard();
@@ -137,7 +137,7 @@ D.categories[type].forEach((c,idx)=>{
 const hasSubs=c.subs&&c.subs.length>0;
 html+=`<div class="cat-group">
         <div class="cat-group-head">
-          ${hasSubs?`<span class="cat-group-toggle" id="arrow_${c.id}" data-action="toggleCatGroup" data-args="${escapeHtml(JSON.stringify([c.id]))}">▶</span>`:'<span style="width:11px;display:inline-block"></span>'}
+          ${hasSubs?`<span class="cat-group-toggle" id="arrow_${c.id}" data-action="toggleCatGroup" data-args="${escapeHtml(JSON.stringify([c.id]))}" role="button" tabindex="0" aria-label="Tampilkan/sembunyikan subkategori ${escapeHtml(c.name)}">▶</span>`:'<span style="width:11px;display:inline-block"></span>'}
           <div class="cat-emoji" data-action="openCatModal" data-args="${escapeHtml(JSON.stringify([idx, type]))}" aria-label="Edit kategori ${escapeHtml(c.name)}">${c.emoji}</div>
           <div class="cat-name" data-action="openCatModal" data-args="${escapeHtml(JSON.stringify([idx, type]))}">${escapeHtml(c.name)}</div>
           <span class="cat-type-badge ${type==='income'?'cat-type-in':'cat-type-out'}">${type==='income'?'Masuk':'Keluar'}</span>

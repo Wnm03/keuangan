@@ -15,8 +15,8 @@ catch(e){ console.error(`Migrasi data ke versi ${m.toVersion} ("${m.desc}") gaga
 });
 D.schemaVersion=SCHEMA_VERSION;
 }
-const APP_BUILD_VERSION = 'kw70-split-backup-restore-rename';
-const PRODUCTION_BUILD_SYNCED_VERSION = 'kw70-split-backup-restore-rename';
+const APP_BUILD_VERSION = 'kw70-a11y-cat-toggle-arialabel';
+const PRODUCTION_BUILD_SYNCED_VERSION = 'kw70-a11y-cat-toggle-arialabel';
 let D = {
 schemaVersion:SCHEMA_VERSION,
 transactions:[],cobek:[],products:[],produsen:[],cobekKategori:JSON.parse(JSON.stringify(DEFAULT_COBEK_KATEGORI)),targets:[],eduFunds:[],reminders:[],bills:[],billsArchive:[],
