@@ -11,7 +11,7 @@
 > file tapi lupa `node build.js`), jalankan ulang generatornya, JANGAN diedit
 > tangan — editan manual bakal ketimpa lagi di build berikutnya.
 
-Terakhir digenerate: 2026-07-11T06:18:32.376Z
+Terakhir digenerate: 2026-07-11T07:47:23.114Z
 Total file source: 50 · Total identifier global: 852
 
 ## 1. Urutan load & ringkasan tiap file
@@ -70,7 +70,7 @@ bundler menggabungkan semua file jadi `app-bundle-a.min.js`/`app-bundle-b.min.js
 | 47 | `payroll-absensi.js` | 366 | Payroll: Absensi Harian & Kalkulator Gaji Mingguan (const Payroll={...}) (v93): dipindah dari backup-restore.js — domain ini sudah rapi sbg 1 objek modul (mirip LinkTx/Renov/Aset), jadi dipisah jadi file domain sendiri, … |
 | 48 | `features-tukang-kendaraan-storage.js` | 1769 | Dana darurat, keuangan/laporan/grafik, budget, cobek grafik, cashflow forecast, target CATATAN: Sparepart (kategori & stok sparepart kendaraan) DIPINDAH ke sini dari features-etalase-piutang-renovai.js (sesi pemisahan … |
 | 49 | `features-aiwidget-reminder-gdrive-search.js` | 1587 | Reminder, hari kerja, kendaraan (pajak/SIM/servis/BBM/sparepart), storage & arsip, skema Google Sheets (SHEETS_SCHEMAS/SHEETS_MODULES) CATATAN: SHEETS_SCHEMAS dipindah dari features-edukasi-pajak-utang-sewakios.js (v57) … |
-| 50 | `features-sheets-pwa-selftest.js` | 2362 | Settings, notifikasi, PWA setup, self-test/smoke-test rendering, pajak/zakat/aset/utang PENTING: file ini HARUS dimuat sesuai urutan build.js (GROUP_A/GROUP_B) karena beberapa modul saling referensi. Urutan grup ini: … |
+| 50 | `features-sheets-pwa-selftest.js` | 2363 | Settings, notifikasi, PWA setup, self-test/smoke-test rendering, pajak/zakat/aset/utang PENTING: file ini HARUS dimuat sesuai urutan build.js (GROUP_A/GROUP_B) karena beberapa modul saling referensi. Urutan grup ini: … |
 
 ## 2. Index fungsi/variabel global → file (urut abjad)
 

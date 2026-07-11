@@ -710,9 +710,10 @@ _selfTestAssert(!D.assets.some(a=>a.id==='__selftest_asset__'),'Aset sementara t
 const netEl=document.getElementById('kbNetWorth');
 if(netEl&&netEl.textContent){
 renderKekayaanBersih();
-const utang=D.pajakZakat.utangJT||parsePzNum(document.getElementById('zmUtang')?document.getElementById('zmUtang').value:0);
-const expected=totalSaldoAkun()+totalAssetValue()-utang;
-_selfTestAssert(parsePzNum(netEl.textContent)===expected,'Kekayaan Bersih harus = saldo akun + total aset − utang');
+const utangManual=D.pajakZakat.utangJT||parsePzNum(document.getElementById('zmUtang')?document.getElementById('zmUtang').value:0);
+const utang=utangManual+totalDebtValue();
+const expected=totalSaldoAkun()+totalAssetValue()+totalPiutangValue()-utang;
+_selfTestAssert(parsePzNum(netEl.textContent)===expected,'Kekayaan Bersih harus = saldo akun + total aset + total piutang − (utang manual + utang tercatat), dapat '+parsePzNum(netEl.textContent)+' vs ekspektasi '+expected);
 }
 }},
 {name:'Regresi bug ID string vs number: pencarian & hapus di Aset/Piutang/Kekayaan/SIM/Zakat (sementara, tidak disimpan)', fn:()=>{

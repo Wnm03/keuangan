@@ -13,6 +13,52 @@
 
 ## SUDAH SELESAI (terverifikasi)
 
+- ✅ **[2026-07-11] Test `reset-gaji-mingguan.js`** (lanjutan daftar nol-test
+  ringan→berat, setelah `profil-pengaturan.js`). File 86 baris: `getWeekRange`
+  (rentang minggu Minggu-Sabtu), `checkWeeklySalaryReset` (deteksi hari Sabtu
+  + prompt sekali sehari + filter absensi dlm rentang minggu),
+  `openWeeklyResetManual` (alur reset manual dari tombol Absensi/Kalkulator
+  Gaji), `confirmWeeklyReset` (konfirmasi reset + catat Pemasukan otomatis,
+  dgn fallback kategori & akun). Dipakai `class FakeDate extends Date` custom
+  (bukan stub objek biasa) krn source butuh `new Date()`/`new Date(x)`
+  berperilaku beda tapi tetap 1 class yg sama. **Tidak ada bug ditemukan** —
+  murni menambah test yg sebelumnya nol. `npm test` → 813/813 pass (naik dari
+  795, +18 test baru). `node build.js` → sukses, versi naik ke build #173.
+  Smoke-test browser (Playwright + Chrome headless) → bersih, 0 `pageerror`.
+  Detail lengkap: lihat `CLAUDE.md`, catatan kerja 2026-07-11 bagian ke-32.
+  Sisa daftar nol-test berikutnya: `filter-laporan.js`.
+
+- ✅ **[2026-07-11] Test `profil-pengaturan.js`** (lanjutan daftar nol-test
+  ringan→berat, setelah `error-handler.js`/`onboarding.js` &
+  `diagnostik-versi.js`). File 81 baris: `autoSaveProfile` (baca form profil,
+  fallback default, field opsional dgn guard sendiri2), `profilePTKPStatus`
+  vs `profileJiwaKeluarga` (2 fungsi murni serupa tapi beda aturan clamp
+  tanggungan), `updateProfilPTKPPreview`, `updateUsiaPreview`,
+  `selectStatusKawin`/`selectTanggungan`/`selectStatusPekerjaan` (toggle chip
+  + save), `toggleApiKeyHint`. **Tidak ada bug ditemukan** — murni menambah
+  test yg sebelumnya nol. `npm test` → 795/795 pass (naik dari 764, +31 test
+  baru). `node build.js` → sukses, versi naik ke build #172. Smoke-test
+  browser (Playwright + Chrome headless) → bersih, 0 `pageerror`. Detail
+  lengkap: lihat `CLAUDE.md`, catatan kerja 2026-07-11 bagian ke-31. Sisa
+  daftar nol-test berikutnya: `reset-gaji-mingguan.js`.
+
+- ✅ **[2026-07-11] Test `error-handler.js` + `onboarding.js`** (2 file paling
+  ringan dari daftar nol-test tersisa, dikerjakan duluan sesuai urutan
+  ringan→berat). `error-handler.js` (37 baris): throttle toast 3 detik,
+  fallback console.warn kalau `toast()` belum siap, error di dalam
+  `toast()` ditangkap diam-diam, & 2 listener global (`error`/
+  `unhandledrejection`) — disuntik `window`/`Date`/`console` tiruan lewat
+  `extraGlobals` krn stub bawaan `loadSource()` no-op (tidak bisa
+  maju-mundurkan waktu / menyimpan handler). `onboarding.js` (40 baris):
+  rumus estimasi gaji bulanan & sisa kiriman (`updateOnboardPreview`),
+  validasi PIN 4 digit, & alur simpan profil+PIN (`finishOnboard`).
+  **Tidak ada bug ditemukan** — murni menambah test yg sebelumnya nol.
+  `npm test` → 733/733 pass (naik dari 715, +18 test baru). `node build.js`
+  → sukses, versi naik ke `kw80-merge-advisor-card-dashcards-42` (build
+  #167), `FILE-MAP.md` diregenerasi (kedua file otomatis hilang dari daftar
+  nol-test). Detail lengkap: lihat `CLAUDE.md`, catatan kerja 2026-07-11
+  bagian ke-28.
+
 - ✅ **[2026-07-11] Housekeeping dokumentasi + `FILE-MAP.md` otomatis.**
   3 hal: (1) 2 item ✅ yang kesasar di "BELUM DIKERJAKAN" dipindah ke
   "SUDAH SELESAI" (2 entri di bawah ini); (2) `PEMISAHAN-FILE-ROADMAP.md`

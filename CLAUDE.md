@@ -2000,3 +2000,550 @@ sync-nya maupun `IDBStore`). Daftar modul nol-test yg TERSISA: `cobek.js`,
 (`keamanan-pin.js` TIDAK termasuk daftar ini — sudah PARSIAL ada test dari
 sesi lebih lama, cek `tests/keamanan-pin.test.js` & catatan kerja terkait utk
 lihat fungsi apa saja yg masih kosong.)
+
+## Catatan kerja — 2026-07-11 (bagian ke-26): test `tx-list-cashflow.js` (dipecah jadi 2 file test)
+
+Konteks: user minta kerjakan 2 file "menengah" dari daftar nol-test di
+bagian ke-25. Dipilih `tx-list-cashflow.js` (160 baris, 9 fungsi: `txHTML`,
+`delTx`, `changeMonth`, `setTxListPeriode`, `getTxListRange`, `setPeriode`,
+`getRange`, `computeCashflowForecast`, `setKeuanganTab`) — sebelumnya nol
+test sama sekali.
+
+**Tidak ada bug ditemukan** — sesi ini murni menambah test yg sebelumnya nol
+utk `tx-list-cashflow.js`, tidak ada perubahan di kode aplikasi.
+
+**Dipecah jadi 2 file test** (bukan 1), pola sama seperti `aset.js` →
+`aset.test.js` + `idb-store.test.js` di bagian ke-25 — file ini punya 2
+kelompok fungsi dgn kebutuhan mock yg beda jauh:
+
+**File baru: `tests/tx-list-cashflow-render.test.js` (22 test).** Kelompok
+render/filter yg cukup di-stub DOM sederhana: `txHTML` (icon/warna sesuai
+tipe & kategori, transfer selalu ⇄, fallback icon default kalau kategori tak
+ketemu, acc-chip, subcategory/note, badge payMethod), `changeMonth` (wrap
+bulan/tahun ke depan & ke belakang), `setTxListPeriode`+`getTxListRange`
+(selamanya/bulan/hari/minggu/tahun/custom), `setPeriode`+`getRange` (versi
+Laporan, elemen DOM beda dari List Transaksi tapi logic serupa),
+`setKeuanganTab` (toggle panel kelola vs laporan, fallback pilih tombol dari
+querySelectorAll kalau `el` tidak diberikan).
+
+**File baru: `tests/tx-list-cashflow-deltx.test.js` (24 test).** Kelompok
+side-effect berat: `delTx` (18 test mencakup semua cabang: batal konfirmasi,
+tanpa link, bbmLinkId, stockItems multi-produk + clamp ke 0, stockProductId
+single-produk, cobekLinkId dgn/tanpa items dgn/tanpa entry ketemu,
+servisLinkId dgn/tanpa usedPartId dgn/tanpa D.servisLogs, renovItemLinkId/
+wishlistLinkId/sewaKiosLinkId/tukangPaymentEntryIds beserta suffix toast
+masing2) & `computeCashflowForecast` (6 test: default vs BudgetReko
+terdefinisi, incAvg/expAvg dari transaksi dlm rentang, billsDue dari
+tagihan ≤30 hari, projected).
+
+**Catatan teknis — 2 edge case toast `delTx` yg gampang salah asumsi kalau
+cuma baca sekilas:**
+- `stockProductId` set tapi produknya sudah tidak ada di `D.products`:
+  TIDAK ADA toast sama sekali (bukan toast generik "🗑 Dihapus") — toast
+  stok butuh `p` ketemu, sedangkan toast generik di baris akhir ditekan
+  krn kondisinya cuma cek `t.stockProductId` truthy, TIDAK peduli apakah
+  produknya ketemu atau tidak.
+- `servisLinkId` set tapi `D.servisLogs` tidak ada sama sekali: seluruh
+  blok servis (termasuk toast "🔧 Catatan servis...") dilewati krn guard
+  `&&D.servisLogs`, TAPI toast generik di akhir JUGA ikut tertekan (kondisi
+  akhir cuma cek `t.servisLinkId`, tidak peduli `D.servisLogs` ada atau
+  tidak) — hasilnya TIDAK ADA toast sama sekali di kasus ini, sempat salah
+  tebak di percobaan pertama (dikira toast generik tetap muncul).
+
+**Catatan teknis lain — variabel global bebas vs module-scoped `let`:**
+`curMonth`/`curYear`/`txListPage`/`filterPeriode` dideklarasikan di
+`features-helpers-global-security.js` (bukan di `tx-list-cashflow.js`),
+diassign langsung tanpa `let` di file ini — sama pola dgn
+`cicilanLastInput` dkk di `cicilan.test.js`: bisa diinject & dibaca balik
+langsung lewat `extraGlobals` `loadSource()`, TANPA trik `expose`.
+`txListPeriode` BEDA — itu `let txListPeriode='bulan'` module-scoped DI
+DALAM `tx-list-cashflow.js` sendiri, jadi dites lewat parameter `expose`
+`loadSource()` (dibaca via `ctx.txListPeriode` setelah `expose:
+['txListPeriode']`) — beda dari pola `editAccIdx` di `akun.test.js` yg
+sengaja TIDAK dibaca langsung (di sini dibaca langsung krn tidak perlu
+verifikasi lewat pemanggil kedua, cukup baca state akhir).
+
+**Diverifikasi:**
+- `node --test tests/*.test.js` → **625/625 pass, 0 fail** (naik dari 579
+  di bagian ke-25, +46 test baru [22 render + 24 deltx/forecast], 0 regresi).
+- `node build.js` → sukses, versi naik otomatis ke
+  `kw80-merge-advisor-card-dashcards-40` (build #165), kedua bundle lolos
+  `node --check` sintaks, `FILE-MAP.md` diregenerasi (52 file — 2 file test
+  baru ikut kehitung di index fungsi global, `tx-list-cashflow.js` otomatis
+  hilang dari daftar nol-test).
+- `node --check tx-list-cashflow.js` → sintaks OK (tidak ada kode aplikasi
+  yg diubah sesi ini).
+- `npm run lint`/`npx eslint` TIDAK bisa dites di sesi ini (sandbox tanpa
+  internet, `npm install`/`npx eslint` gagal 403) — sama seperti
+  keterbatasan sesi-sesi sebelumnya, tolong jalankan `npm run lint` sebelum
+  merge/release.
+- Smoke-test browser TIDAK dijalankan ulang sesi ini — perubahan murni
+  penambahan file test, tidak menyentuh kode runtime app sama sekali
+  (`tx-list-cashflow.js` tidak diubah), jadi risiko regresi UI nol.
+
+**Untuk sesi berikutnya — daftar modul nol-test yg TERSISA (2 sudah
+selesai sesi ini):** `cobek.js` (1261 baris, terbesar, disisakan paling
+akhir — butuh sesi tersendiri utk dipetakan strukturnya dulu),
+`backup-restore.js`, `payroll-absensi.js`, `kasir.js`, `sewakios.js`,
+`renovasi.js`, `tagihan-kalender.js`, `reset-gaji-mingguan.js`, `modals.js`,
+`modal-navigasi.js`, `onboarding.js`, `profil-pengaturan.js`, `kategori.js`,
+`kategorisasi-ai.js`, `linktx.js`, `filter-laporan.js`,
+`diagnostik-versi.js`, `debug-console.js`, `error-handler.js`,
+`features-aiwidget-reminder-gdrive-search.js`,
+`features-sheets-pwa-selftest.js`.
+
+## Catatan kerja — 2026-07-11 (bagian ke-27): test `kategori.js` + `kategorisasi-ai.js`
+
+Konteks: user minta kerjakan 2 file "kecil" dari daftar nol-test di bagian
+ke-26. Dipilih `kategori.js` (167 baris, 19 fungsi: CRUD Kategori & Subkategori
++ filter dropdown) dan `kategorisasi-ai.js` (185 baris, objek `AutoKat` dgn
+6 method: AI auto-kategorisasi dari catatan bebas Input Transaksi) —
+sebelumnya nol test sama sekali utk keduanya.
+
+**Tidak ada bug ditemukan** — sesi ini murni menambah test yg sebelumnya
+nol utk kedua file, tidak ada perubahan di kode aplikasi.
+
+**File baru: `tests/kategori.test.js` (56 test).** Cakupan: `getAllCats`/
+`getCatsByType`/`getCat`/`getCatByType` (termasuk kasus nama kategori
+duplikat di income & expense — dipilih yg subs-nya paling banyak),
+`uniqueCatList`/`subNamesForCat`, `populateCatSelect`/`populateSubSelect`
+(preserve value lama kalau masih valid, reset ke "semua" kalau tidak),
+`openCatModal`/`delCatFromModal`/`setCatModalType`/`refreshTxCatIfOpen`,
+`saveCat`/`delCat` (rename kategori ikut menyesuaikan `category` di
+transaksi & bills, pesan konfirmasi beda utk kategori bawaan/default vs
+kategori yg masih dipakai transaksi), `openSubCatModal`/`saveSubCat`/
+`delSubCat` (rename subkategori ikut menyesuaikan `subcategory` di
+transaksi & bills — HANYA yg `category`-nya juga cocok), `toggleCatGroup`,
+`filterCat`.
+
+**File baru: `tests/kategorisasi-ai.test.js` (34 test).** Cakupan seluruh
+method `AutoKat`: `onNoteInput` (debounce 750ms, tebakan lokal instan hanya
+utk expense & field kategori kosong), `hideSuggest`, `runAiSuggest`
+(guard: catatan <4 char, tanpa API key, catatan sama dgn query terakhir,
+tidak ada kategori sama sekali, AI balas kategori di luar daftar yg
+diizinkan → diabaikan, respons gagal/error/JSON tidak valid → ditangkap
+diam-diam, field Keterangan berubah sejak request dikirim → saran basi
+tidak ditampilkan, token check request basi), `renderSuggest`, `apply`
+(isi kategori+subkategori via `selectTxCat`/`selectTxSubCat` atau fallback
+`txCat.value` langsung, lalu "belajar" ke `D.learnedItemCat`), `learnFromNote`
+(filter stopword/angka/kata <4 huruf, maksimal 4 kata kunci per catatan).
+
+**Catatan teknis — dependency lintas-file yg perlu di-stub manual:**
+- `kategori.js`: state module-scoped (`catEditIdx`/`curCatModalType`/
+  `catModalCallback`/`subCatParentId`/`subCatParentType`/`subCatEditId`/
+  `curCatFilter`) TIDAK dideklarasikan `let` di file ini sendiri (dideklarasikan
+  di `features-helpers-global-security.js`) — pola sama dgn `curMonth`/
+  `curYear` di `tx-list-cashflow.test.js`: diinject & dibaca balik langsung
+  lewat `extraGlobals` `loadSource()`, tanpa trik `expose`.
+- `kategori.js`: `DEFAULT_CATS` didefinisikan di `renovasi.js` (di luar
+  cakupan test ini) — di-stub `{income:[],expense:[]}` per default, sama
+  pola dgn `identitas.test.js`.
+- `kategori.js`: `populateCatSelect` baca `[...sel.options]` (bukan cuma
+  `innerHTML`) buat cek value lama masih valid — `fakeDom.js` TIDAK
+  mem-parsing `innerHTML` jadi elemen beneran, jadi ditambah helper lokal
+  `withOptionsSupport(el)` (override `innerHTML` jadi accessor yg
+  meng-extract `<option value="...">` via regex ke `el.options`) khusus
+  test file ini, TIDAK diubah di `helpers/fakeDom.js` bersama (supaya tidak
+  mempengaruhi test lain).
+- `kategorisasi-ai.js`: `getCatsByType` berasal dari `kategori.js` (tidak
+  di-load bareng) — di-stub baca langsung dari `D.categories[type]`.
+- `kategorisasi-ai.js`: `setTimeout`/`clearTimeout` bawaan `loadSource()`
+  cuma stub no-op (return 0, TIDAK menjalankan callback) — disuntik fake
+  timer LOKAL (simpan `{id,fn,ms}`, TIDAK auto-invoke) via `extraGlobals`,
+  supaya `onNoteInput` bisa dites bagian debounce-nya (terjadwal/clearTimeout)
+  terpisah dari `runAiSuggest` yg dites LANGSUNG (tanpa lewat timer) — pola
+  sama semangatnya dgn `_saveAccInner`/`_saveInner` di file lain.
+
+**Catatan teknis — jebakan yg sempat salah di percobaan pertama:**
+- Field DOM (`catName`/`catEmoji`) yg di-set lewat `domValues` SEBELUM
+  `openCatModal()` dipanggil ketimpa lagi oleh `openCatModal()` (persis
+  peringatan yg sudah didokumentasikan di bagian ke-24 soal `openModal()`
+  vs `domValues`) — diperbaiki: panggil `openCatModal()` dulu, baru set
+  `fakeDocument.getElementById(...).value` sesudahnya.
+- Return value function yg lahir di dalam vm context (array/objek dari
+  `getCat`/`uniqueCatList`/`subNamesForCat`) TIDAK bisa dibandingkan pakai
+  `assert.deepEqual`/`deepStrictEqual` (beda prototype/realm dgn host,
+  sudah didokumentasikan di `aset.test.js`/`fi-calc.test.js`) — dipakai
+  helper lokal `sameJson()` (`JSON.stringify` kedua sisi) di
+  `kategori.test.js`.
+- `opts.selectTxCat || defaultFn` di helper `makeAutoKat` awalnya bikin
+  test "selectTxCat tidak tersedia (fallback ke txCat.value)" gagal karena
+  `undefined || defaultFn` tetap balik `defaultFn` — diperbaiki pakai
+  `'selectTxCat' in opts ? opts.selectTxCat : defaultFn` supaya `undefined`
+  yg SENGAJA dioper tidak diam-diam ketimpa.
+
+**Diverifikasi:**
+- `node --test tests/*.test.js` → **715/715 pass, 0 fail** (naik dari 625
+  di bagian ke-26, +90 test baru [56 kategori + 34 kategorisasi-ai], 0 regresi).
+- `node build.js` → sukses, versi naik otomatis ke
+  `kw80-merge-advisor-card-dashcards-41` (build #166), kedua bundle lolos
+  `node --check` sintaks, `FILE-MAP.md` diregenerasi (50 file, 852
+  identifier — `kategori.js`/`kategorisasi-ai.js` otomatis hilang dari
+  daftar nol-test).
+- `npm run lint`/`npx eslint` TIDAK bisa dites di sesi ini (sandbox tanpa
+  internet, `npm install`/`npx eslint` gagal 403) — sama seperti
+  keterbatasan sesi-sesi sebelumnya, tolong jalankan `npm run lint` sebelum
+  merge/release.
+- Smoke-test browser TIDAK dijalankan ulang sesi ini — perubahan murni
+  penambahan file test, tidak menyentuh kode runtime app sama sekali
+  (`kategori.js`/`kategorisasi-ai.js` tidak diubah), jadi risiko regresi
+  UI nol.
+
+**Untuk sesi berikutnya — daftar modul nol-test yg TERSISA (2 sudah
+selesai sesi ini):** `cobek.js` (1261 baris, terbesar, disisakan paling
+akhir — butuh sesi tersendiri utk dipetakan strukturnya dulu),
+`backup-restore.js`, `payroll-absensi.js`, `kasir.js`, `sewakios.js`,
+`renovasi.js`, `tagihan-kalender.js`, `reset-gaji-mingguan.js`, `modals.js`,
+`modal-navigasi.js`, `onboarding.js`, `profil-pengaturan.js`, `linktx.js`,
+`filter-laporan.js`, `diagnostik-versi.js`, `debug-console.js`,
+`error-handler.js`, `features-aiwidget-reminder-gdrive-search.js`,
+`features-sheets-pwa-selftest.js`.
+
+## Catatan kerja — 2026-07-11 (bagian ke-28): test `error-handler.js` + `onboarding.js`
+
+Konteks: lanjutan daftar modul nol-test dari bagian ke-27, dikerjakan dari yang
+paling RINGAN dulu (urutan baris): `modals.js` (6 baris, dilewati — murni array
+string HTML modal statis, tidak ada logic buat dites) → `error-handler.js` (37
+baris) → `onboarding.js` (40 baris). Kedua file ini sebelumnya nol test sama
+sekali.
+
+**Tidak ada bug ditemukan** — sesi ini murni menambah test yg sebelumnya nol
+utk kedua file, tidak ada perubahan di kode aplikasi.
+
+**File baru: `tests/error-handler.test.js` (11 test).** Cakupan
+`_friendlyErrorNotice`: pesan normal (toast dgn detail & durasi 5000ms),
+pesan `undefined` (detail dikosongkan, bukan jadi string `": undefined"`),
+pesan >120 karakter dipotong, throttle 3 detik (panggilan kedua dlm window
+diabaikan, tepat di batas 3000ms jalan lagi), fallback ke `console.warn`
+kalau `toast` belum jadi function, error yg dilempar `toast()` sendiri
+ditangkap diam-diam (tidak crash). Juga dites 2 listener global
+`window.addEventListener('error'/'unhandledrejection', ...)`: format
+`console.error` yg benar (`e.error||e.message` utk listener error,
+`e.reason` utk unhandledrejection), serta bukti kedua listener berbagi
+throttle counter yang sama (`_lastErrorToastAt` global, bukan per-listener).
+
+**File baru: `tests/onboarding.test.js` (7 test).** Cakupan
+`updateOnboardPreview`: guard elemen `obPreviewBox` tidak ada (return dini
+tanpa error), rumus estimasi (`gaji×26` hari kerja, dikurangi `kirim×4`),
+warna hijau/merah sesuai tanda hasil, fallback `||0` utk input
+kosong/non-angka. Cakupan `finishOnboard`: PIN bukan 4 digit ditolak (tidak
+menyimpan apapun, `showAlertModal` dipanggil dgn pesan yg benar), alur
+sukses (profil tersimpan persis sesuai field, PIN di-hash via `hashPin`,
+`_sessionRawPin` ke-set, `kw_pin`/`kw_setup` ke-`safeSetItem`, `save()` &
+`showMain()` terpanggil, elemen `#onboard` disembunyikan), & default value
+nama/gaji/kiriman kalau field dikosongkan.
+
+**Catatan teknis — kenapa `window`/`Date` perlu di-mock manual utk
+`error-handler.js`:** stub bawaan `loadSource()` (`makePermissiveStub`)
+sengaja permisif tapi TIDAK stateful — `window.addEventListener(...)`
+selalu balik stub baru tanpa nyimpen handler-nya, jadi listener yg
+didaftarkan tidak bisa dipanggil balik dari test. Begitu juga `Date.now()`
+asli tidak bisa dimaju-mundurkan tanpa nunggu beneran (throttle-nya 3
+detik). Solusinya: `extraGlobals: { window: fakeWindow, Date: fakeDate }`
+dgn `fakeWindow.addEventListener` yg nyimpen handler ke object biasa
+(`listeners[evt]=fn`) & `fakeDate={now:()=>t}` (bisa diubah lewat closure
+`setTime()`) — cukup krn `error-handler.js` cuma pakai `Date.now()`, tidak
+perlu tiruan class `Date` penuh.
+
+**Catatan teknis — jebakan yg sempat salah di percobaan pertama:**
+- Beberapa test awal pakai `time: 1000` sbg waktu awal, tapi
+  `_lastErrorToastAt` module-scoped mulai dari `0` — jadi `now(1000)-0=1000`
+  masih `<3000`, throttle nge-blok toast PERTAMA yang harusnya lolos.
+  Diperbaiki: waktu awal test non-throttle dinaikkan ke `>=3000` (dipakai
+  `5000`) supaya panggilan pertama tidak keblokir throttle residual dari
+  `_lastErrorToastAt=0`.
+- `assert.deepEqual(D.profile, {...})` di `onboarding.test.js` gagal
+  (`reference-equal` check) krn `D.profile` lahir di dalam vm context, beda
+  prototype/realm dgn object literal host — pola yg sama persis sudah
+  didokumentasikan di `aset.test.js`/`fi-calc.test.js`/`kategori.test.js`.
+  Diperbaiki: bandingkan lewat `JSON.stringify` kedua sisi.
+- `modals.js` (6 baris efektif, isinya cuma 1 array `MODAL_HTML` berisi
+  string HTML mentah blok modal) SENGAJA dilewati — bukan "belum sempat",
+  tapi memang tidak ada logic murni utk dites di sana (beda dari file lain
+  di daftar nol-test yang semuanya punya fungsi).
+
+**Diverifikasi:**
+- `node --test tests/*.test.js` → **733/733 pass, 0 fail** (naik dari 715
+  di bagian ke-27, +18 test baru [11 error-handler + 7 onboarding], 0 regresi).
+- `node build.js` → sukses, versi naik otomatis ke
+  `kw80-merge-advisor-card-dashcards-42` (build #167), kedua bundle lolos
+  `node --check` sintaks, `FILE-MAP.md` diregenerasi (50 file, 852
+  identifier — `error-handler.js`/`onboarding.js` otomatis hilang dari
+  daftar nol-test).
+- `npm run lint`/`npx eslint` TIDAK bisa dites di sesi ini (sandbox tanpa
+  internet, `npm install`/`npx eslint` gagal 403) — sama seperti
+  keterbatasan sesi-sesi sebelumnya, tolong jalankan `npm run lint` sebelum
+  merge/release.
+- Smoke-test browser TIDAK dijalankan ulang sesi ini — perubahan murni
+  penambahan file test, tidak menyentuh kode runtime app sama sekali
+  (`error-handler.js`/`onboarding.js` tidak diubah), jadi risiko regresi
+  UI nol.
+
+**Untuk sesi berikutnya — daftar modul nol-test yg TERSISA (2 sudah
+selesai sesi ini, `modals.js` dilewati krn murni data statis tanpa
+logic):** `debug-console.js` (48 baris), `diagnostik-versi.js` (76 baris),
+`profil-pengaturan.js` (81 baris), `reset-gaji-mingguan.js` (86 baris),
+`filter-laporan.js` (220 baris), `kasir.js` (221 baris), `sewakios.js` (242
+baris), `linktx.js` (244 baris), `modal-navigasi.js` (284 baris),
+`payroll-absensi.js` (365 baris), `renovasi.js` (437 baris),
+`tagihan-kalender.js` (443 baris), `backup-restore.js` (718 baris),
+`cobek.js` (1261 baris, terbesar, disisakan paling akhir — butuh sesi
+tersendiri utk dipetakan strukturnya dulu),
+`features-aiwidget-reminder-gdrive-search.js` (1586 baris),
+`features-sheets-pwa-selftest.js` (2361 baris). Lanjutkan urutan
+ringan→berat: `debug-console.js` berikutnya.
+
+## Catatan kerja — 2026-07-11 (bagian ke-29): test `debug-console.js` + perbaikan test basi Kekayaan Bersih
+
+Konteks: lanjutan daftar modul nol-test dari bagian ke-28, urutan ringan→berat:
+`debug-console.js` (48 baris) berikutnya. Sesi ini juga memperbaiki 1 test
+in-app (`getSelfTestCases()` di `features-sheets-pwa-selftest.js`) yang gagal
+karena rumus ekspektasinya basi, ketinggalan dari formula asli `renderBersih()`.
+
+**Perbaikan test basi (bukan bug aplikasi):** test "Buku Aset: totalAssetValue()
+& Kekayaan Bersih konsisten" cuma bandingkan `saldoAkun+totalAset-utangManual`,
+padahal `Kekayaan.renderBersih()` (modules-calc.js) sudah lama diperluas ikut
+memasukkan `totalPiutangValue()` (piutang menambah) dan `totalDebtValue()`
+(utang tercatat lain, bukan cuma `utangJT` manual) ke rumus Kekayaan Bersih.
+Diperbaiki: rumus ekspektasi di test disamakan dgn `renderBersih()` +
+pesan assert ditambah nilai aktual vs ekspektasi biar lebih gampang didiagnosis
+kalau gagal lagi nanti.
+
+**File baru: `tests/debug-console.test.js` (14 test).** Cakupan
+`updateDebugConsoleBtn` (tombol tidak ada -> return dini, teks sesuai status
+aktif/tidak) & `toggleDebugConsole`: alur mematikan (hapus key, `eruda.destroy()`
+dipanggil HANYA kalau `window.eruda` ada, error dari `destroy()` ditangkap diam-diam),
+alur mengaktifkan saat eruda SUDAH pernah dimuat (`window.eruda` ada -> langsung
+`eruda.init()`, tidak bikin `<script>` baru), dan alur lazy-load CDN saat eruda
+BELUM pernah dimuat (key `kw_debug_console` di-set OPTIMIS duluan sebelum script
+selesai load, `<script>` di-append ke `document.head` kalau ada / fallback ke
+`document.documentElement`, `onload` sukses vs `onload` yg `eruda.init()`-nya
+error tetap toast+update tombol tapi pesannya beda, `onerror` rollback key +
+toast pesan butuh internet).
+
+**Catatan teknis — kenapa `window.eruda` & `eruda` (bare global) perlu disuntik
+manual biar konsisten:** di browser asli, `window` ADALAH global object, jadi
+`window.eruda` dan bare `eruda` otomatis nunjuk objek yang sama begitu script
+CDN eruda selesai load. Stub `loadSource()` yang dipakai di sini `window` cuma
+objek biasa terpisah dari context vm top-level, jadi kalau tidak disamakan
+manual, `if(window.eruda)` (dipakai `toggleDebugConsole` utk pre-check) & bare
+`eruda.init()`/`eruda.destroy()` (dipakai langsung, bukan lewat `window.`) bisa
+nunjuk 2 objek beda dan test jadi salah baca. Solusi: helper `setEruda()`/opsi
+`erudaPresent` di test set KEDUANYA (`fakeWindow.eruda` dan `ctx.eruda`) ke
+objek yang sama.
+
+**Diverifikasi:**
+- `node --test tests/*.test.js` → **747/747 pass, 0 fail** (naik dari 733 di
+  bagian ke-28, +14 test baru [debug-console], 0 regresi).
+- `node build.js` → sukses, versi naik otomatis, kedua bundle lolos
+  `node --check` sintaks, `FILE-MAP.md` diregenerasi (`debug-console.js`
+  otomatis hilang dari daftar nol-test).
+- `npm run lint`/`npx eslint` TIDAK bisa dites di sesi ini (sandbox tanpa
+  internet, `npm install` gagal) — tolong jalankan `npm run lint` sebelum
+  merge/release.
+- Smoke-test browser TIDAK dijalankan ulang sesi ini — perubahan test murni
+  tidak menyentuh `debug-console.js`/`modules-calc.js` (logic asli tidak
+  diubah, cuma rumus ekspektasi di 1 test in-app), risiko regresi UI nol.
+
+**Untuk sesi berikutnya — daftar modul nol-test yg TERSISA (1 sudah selesai
+sesi ini):** `diagnostik-versi.js` (76 baris), `profil-pengaturan.js` (81
+baris), `reset-gaji-mingguan.js` (86 baris), `filter-laporan.js` (220 baris),
+`kasir.js` (221 baris), `sewakios.js` (242 baris), `linktx.js` (244 baris),
+`modal-navigasi.js` (284 baris), `payroll-absensi.js` (365 baris),
+`renovasi.js` (437 baris), `tagihan-kalender.js` (443 baris),
+`backup-restore.js` (718 baris), `cobek.js` (1261 baris, terbesar, disisakan
+paling akhir), `features-aiwidget-reminder-gdrive-search.js` (1586 baris),
+`features-sheets-pwa-selftest.js` (2361 baris). Lanjutkan urutan
+ringan→berat: `diagnostik-versi.js` berikutnya.
+
+## Catatan kerja — 2026-07-11 (bagian ke-30): test `diagnostik-versi.js`
+
+Konteks: lanjutan daftar modul nol-test dari bagian ke-29, urutan ringan→berat:
+`diagnostik-versi.js` (76 baris) berikutnya. Tidak ada bug ditemukan — murni
+menambah test yg sebelumnya nol, tidak ada perubahan di kode aplikasi.
+
+**File baru: `tests/diagnostik-versi.test.js` (17 test).** Cakupan
+`getHtmlSnapshotForSelfTest` (proxy tipis ke `document.documentElement.outerHTML`),
+`computeProductionSyncStatus` (sinkron vs ketinggalan, format label beda antara
+2 cabang — cabang sinkron pakai prefix `v` sebelum nomor versi, cabang
+ketinggalan TIDAK), `computeModuleSyncStatus` (semua sinkron, 1 modul
+ketinggalan, variabel versi modul belum ke-load sama sekali via
+`typeof x!=='undefined'`), IIFE `_checkModuleVersionSync` yang **jalan
+otomatis saat file di-load** (semua sinkron → tidak ada warn/toast; 1 atau
+lebih modul beda versi → console.warn + toast durasi 6000 berisi daftar file
+bermasalah; `toast` belum jadi function → tetap warn, tidak crash; error tak
+terduga di dalam cek → ditangkap `catch` luar, lapor via `console.error`), dan
+`computeFileSizeStatus` (boundary persis di `FILE_SIZE_WARN_BYTES`=2.0MB &
+`FILE_SIZE_ACTION_BYTES`=2.5MB, termasuk kasus off-by-one 1 byte di bawah
+tiap ambang).
+
+**Catatan teknis — kenapa test file ini beda pola dari file lain:** IIFE
+top-level `_checkModuleVersionSync()` di `diagnostik-versi.js` jalan sekali
+otomatis PERSIS saat `loadSource()` mengeksekusi file (bukan saat fungsi
+dipanggil manual seperti file lain) — jadi tiap skenario kombinasi versi beda
+butuh `loadSource()` BARU (tidak bisa reuse 1 `ctx` utk banyak `test()` spt
+pola file lain di repo ini), karena side-effect-nya sudah "kejadian" di
+load-time, tidak bisa di-reset.
+
+**Catatan teknis — jebakan yg sempat salah di percobaan pertama:** versi test
+awal dipakai `'v100'`/`'v50'` dst sbg NILAI variabel (mis.
+`MODAL_VERSION='v99'`), padahal source-nya sendiri sudah nambahin prefix `'v'`
+di beberapa tempat (`'...v'+modalVersion`) — hasilnya jadi dobel `vv99` di
+pesan. Diperbaiki: nilai versi di test pakai angka polos tanpa prefix
+(`'100'`, `'99'`, dst), meniru cara `APP_BUILD_VERSION` asli dipakai
+(angka/label build, prefix `v` cuma ditambah di template string tempat
+dipakai, tidak di value-nya). Juga 1 test awal cuma nge-override
+`APP_BUILD_VERSION` sendirian tanpa nyamain versi modul lain ke nilai yg sama
+→ salah nangkep `allOk` jadi `false` padahal maksudnya semua-sinkron;
+diperbaiki dgn override eksplisit ke-5 variabel versi ke nilai yg sama.
+
+**Diverifikasi:**
+- `node --test tests/*.test.js` → **764/764 pass, 0 fail** (naik dari 747 di
+  bagian ke-29, +17 test baru [diagnostik-versi], 0 regresi).
+- `node build.js` → sukses, versi naik otomatis, kedua bundle lolos
+  `node --check` sintaks, `FILE-MAP.md` diregenerasi (`diagnostik-versi.js`
+  otomatis hilang dari daftar nol-test).
+- `npm run lint`/`npx eslint` TIDAK bisa dites di sesi ini (sandbox tanpa
+  internet) — tolong jalankan `npm run lint` sebelum merge/release.
+- Smoke-test browser TIDAK dijalankan ulang sesi ini — perubahan test murni,
+  `diagnostik-versi.js` tidak diubah sama sekali, risiko regresi UI nol.
+
+**Untuk sesi berikutnya — daftar modul nol-test yg TERSISA (1 sudah selesai
+sesi ini):** `profil-pengaturan.js` (81 baris), `reset-gaji-mingguan.js` (86
+baris), `filter-laporan.js` (220 baris), `kasir.js` (221 baris), `sewakios.js`
+(242 baris), `linktx.js` (244 baris), `modal-navigasi.js` (284 baris),
+`payroll-absensi.js` (365 baris), `renovasi.js` (437 baris),
+`tagihan-kalender.js` (443 baris), `backup-restore.js` (718 baris),
+`cobek.js` (1261 baris, terbesar, disisakan paling akhir),
+`features-aiwidget-reminder-gdrive-search.js` (1586 baris),
+`features-sheets-pwa-selftest.js` (2361 baris). Lanjutkan urutan
+ringan→berat: `profil-pengaturan.js` berikutnya.
+
+## Catatan kerja — 2026-07-11 (bagian ke-31): test `profil-pengaturan.js`
+
+Konteks: lanjutan daftar modul nol-test dari bagian ke-30, urutan
+ringan→berat: `profil-pengaturan.js` (81 baris) berikutnya. Tidak ada bug
+ditemukan — murni menambah test yg sebelumnya nol, tidak ada perubahan di
+kode aplikasi.
+
+**File baru: `tests/profil-pengaturan.test.js` (31 test).** Cakupan
+`autoSaveProfile` (baca semua input form profil & tulis ke `D.profile`,
+fallback default nama/gaji/kiriman kalau kosong/non-angka, field opsional
+lembur/tarif-minggu/tanggal-lahir/API-key/provider yg masing2 dijaga guard
+`if(el)` sendiri, `persistApiKeyEncrypted()` cuma jalan kalau elemen
+`sApiKey` ada, `save()` tepat 1x), `profilePTKPStatus`/`profileJiwaKeluarga`
+(pasangan fungsi murni yg SAMA-SAMA baca `statusKawin`/`tanggungan` tapi beda
+aturan clamp — PTKP status di-clamp maksimal 3 tanggungan buat kode `TK0`..`K3`,
+sedangkan hitung jiwa keluarga TIDAK di-clamp sama sekali), `updateProfilPTKPPreview`
+(format tampilan beda antara cabang `TK`/`K`, mis. `TK0`→`TK/0` vs `K2`→`K/2`),
+`updateUsiaPreview` (sembunyi kalau tanggal lahir kosong, tampil + panggil
+`fiCalcAge` kalau ada), `selectStatusKawin`/`selectTanggungan`/`selectStatusPekerjaan`
+(toggle chip aktif via `querySelectorAll`, update state, panggil `save()`,
+`selectStatusPekerjaan` tambahan panggil `renderPajakRekomendasi(true)`), dan
+`toggleApiKeyHint` (placeholder & link bantuan beda antara provider `gemini`
+vs lainnya).
+
+**Catatan teknis — jebakan yg sempat salah di percobaan pertama:**
+`fakeDom.js` punya `getElementById` yg SELALU meng-auto-vivifikasi elemen
+kosong (tidak pernah balik `null`/`undefined`), jadi 2 test awal yg
+mengasumsikan "elemen opsional tidak didaftarkan di `domInitial` → guard
+`if(el)` gagal" ternyata salah — elemen tetap ada (kosong), guard tetap lolos,
+cuma fallback ke nilai default krn `value` kosong. Diperbaiki dgn pola yg
+sudah ada di file test lain (`akun.test.js`/`aset.test.js`): override
+`fakeDocument.getElementById` secara eksplisit supaya balik `null` utk id
+tertentu, baru guard-nya beneran teruji. Juga 1 test `classList` awal salah
+pakai array literal langsung di `domInitial` (`createFakeDocument` internal
+pakai `Object.assign` yg menimpa objek `classList` bawaan jadi array biasa
+tanpa `contains()`/`remove()`) — diperbaiki dgn `createFakeElement({classList:[...]})`
+eksplisit sebelum di-passing (pola sama spt `fi-calc.test.js`).
+
+**Diverifikasi:**
+- `node --test tests/*.test.js` → **795/795 pass, 0 fail** (naik dari 764 di
+  bagian ke-30, +31 test baru [profil-pengaturan], 0 regresi).
+- `node build.js` → sukses, versi naik ke `kw80-merge-advisor-card-dashcards-47`
+  (build #172), kedua bundle lolos `node --check` sintaks, `FILE-MAP.md`
+  diregenerasi (`profil-pengaturan.js` otomatis hilang dari daftar nol-test).
+- Smoke-test browser (Playwright + Chrome headless,
+  `/home/claude/.cache/puppeteer/chrome/linux-131.0.6778.204/chrome-linux64/chrome`)
+  → `✅ [smoke-test] OK — 992 referensi getElementById() & 55 data-action
+  semuanya valid`, 0 `pageerror`.
+- `npm run lint`/`npx eslint` TIDAK bisa dites di sesi ini (sandbox tanpa
+  internet, `npm install` gagal dgn 403) — tolong jalankan `npm run lint`
+  sebelum merge/release.
+
+**Untuk sesi berikutnya — daftar modul nol-test yg TERSISA (1 sudah selesai
+sesi ini):** `reset-gaji-mingguan.js` (86 baris), `filter-laporan.js` (220
+baris), `kasir.js` (221 baris), `sewakios.js` (242 baris), `linktx.js` (244
+baris), `modal-navigasi.js` (284 baris), `payroll-absensi.js` (365 baris),
+`renovasi.js` (437 baris), `tagihan-kalender.js` (443 baris),
+`backup-restore.js` (718 baris), `cobek.js` (1261 baris, terbesar, disisakan
+paling akhir), `features-aiwidget-reminder-gdrive-search.js` (1586 baris),
+`features-sheets-pwa-selftest.js` (2361 baris). Lanjutkan urutan
+ringan→berat: `reset-gaji-mingguan.js` berikutnya.
+
+## Catatan kerja — 2026-07-11 (bagian ke-32): test `reset-gaji-mingguan.js`
+
+Konteks: lanjutan daftar modul nol-test dari bagian ke-31, urutan
+ringan→berat: `reset-gaji-mingguan.js` (86 baris) berikutnya. Tidak ada bug
+ditemukan — murni menambah test yg sebelumnya nol, tidak ada perubahan di
+kode aplikasi.
+
+**File baru: `tests/reset-gaji-mingguan.test.js` (18 test).** Cakupan
+`getWeekRange` (rentang Minggu 00:00:00.000 s/d Sabtu 23:59:59.999, sama utk
+input hari apa saja dlm minggu itu), `checkWeeklySalaryReset` (guard "bukan
+hari Sabtu" & "sudah di-prompt hari ini" sama2 return awal tanpa efek
+samping, filter absensi yg BENAR-BENAR jatuh di rentang minggu berjalan
+[absensi minggu lalu sengaja diselipkan sbg kontrol negatif], render ringkasan
+ke DOM + buka modal, `wrAccWrap`/`wrAcc` kondisional ke `D.accounts.length`),
+`openWeeklyResetManual` (toast peringatan kalau kosong vs alur lengkap kalau
+ada: `populateAccFilters()`, isi ringkasan, tutup 2 modal sumber lalu buka
+modal reset), dan `confirmWeeklyReset` (cabang `yes=false` cuma catat prompt
+date + re-render tanpa sentuh `D.workDays`/`renderKeuangan`; cabang
+`yes=true` selalu reset `D.workDays` minggu ini terlepas dari status
+auto-income, TAPI transaksi Pemasukan & `renderKeuangan()` cuma jalan kalau
+checkbox aktif DAN total>0; kategori dicari via regex `/gaji/i` dgn 2 lapis
+fallback [kategori income pertama, lalu literal `'Gaji'`]; `accountId`
+fallback ke akun pertama atau `null` kalau `D.accounts` kosong).
+
+**Catatan teknis — kenapa test file ini beda pola dari file lain:** file ini
+pakai `new Date()` (tanpa argumen) utk deteksi "sekarang" (hari Sabtu?,
+rentang minggu berjalan), TAPI juga pakai `new Date(x)` dgn argumen (parsing
+tanggal absensi via `new Date(w.date)`, copy-constructor `new Date(start)`)
+yg harus tetap berperilaku spt Date asli (`getDay`/`setDate`/`setHours` dst).
+Stub `Date.now()` sederhana (pola `error-handler.test.js`) tidak cukup —
+dibuat `class FakeDate extends Date` yg cuma meng-override constructor
+tanpa-argumen ke waktu tetap, delegasi ke `super(...args)` utk selebihnya.
+Sandbox Node ini kebetulan ber-TZ UTC (offset 0, dicek via
+`new Date().getTimezoneOffset()`), jadi string ISO `'YYYY-MM-DD'` polos aman
+dipakai konsisten tanpa geser hari.
+
+Var modul `_wrLastTotal`/`_wrLastCount` dideklarasikan pakai `let` (bukan
+implicit-global spt `_sessionRawPin` di `onboarding.js`), jadi TIDAK
+menempel ke objek context vm & tidak bisa di-inject langsung dari test.
+Solusinya: test `confirmWeeklyReset` selalu memanggil `openWeeklyResetManual()`
+dulu (yg secara alami mengisi kedua var itu lewat closure) sebelum memanggil
+`confirmWeeklyReset()` — pola ini juga meniru urutan pemakaian ASLI di app
+(tombol buka modal reset selalu dipencet dulu sebelum tombol konfirmasi).
+
+**Diverifikasi:**
+- `node --test tests/*.test.js` → **813/813 pass, 0 fail** (naik dari 795 di
+  bagian ke-31, +18 test baru [reset-gaji-mingguan], 0 regresi).
+- `node build.js` → sukses, versi naik ke build #173, kedua bundle lolos
+  `node --check` sintaks, `FILE-MAP.md` diregenerasi
+  (`reset-gaji-mingguan.js` otomatis hilang dari daftar nol-test).
+- Smoke-test browser (Playwright + Chrome headless) → `✅ [smoke-test] OK —
+  992 referensi getElementById() & 55 data-action semuanya valid`, 0
+  `pageerror`.
+- `npm run lint`/`npx eslint` TIDAK bisa dites di sesi ini (sandbox tanpa
+  internet, `npm install` gagal dgn 403) — tolong jalankan `npm run lint`
+  sebelum merge/release.
+
+**Untuk sesi berikutnya — daftar modul nol-test yg TERSISA (1 sudah selesai
+sesi ini):** `filter-laporan.js` (220 baris), `kasir.js` (221 baris),
+`sewakios.js` (242 baris), `linktx.js` (244 baris), `modal-navigasi.js` (284
+baris), `payroll-absensi.js` (365 baris), `renovasi.js` (437 baris),
+`tagihan-kalender.js` (443 baris), `backup-restore.js` (718 baris),
+`cobek.js` (1261 baris, terbesar, disisakan paling akhir),
+`features-aiwidget-reminder-gdrive-search.js` (1586 baris),
+`features-sheets-pwa-selftest.js` (2361 baris). Lanjutkan urutan
+ringan→berat: `filter-laporan.js` berikutnya.
