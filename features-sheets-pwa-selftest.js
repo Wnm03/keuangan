@@ -711,9 +711,9 @@ const netEl=document.getElementById('kbNetWorth');
 if(netEl&&netEl.textContent){
 renderKekayaanBersih();
 const utangManual=D.pajakZakat.utangJT||parsePzNum(document.getElementById('zmUtang')?document.getElementById('zmUtang').value:0);
-const utang=utangManual+totalDebtValue();
+const utang=utangManual+totalDebtValue()+totalCicilanOutstanding();
 const expected=totalSaldoAkun()+totalAssetValue()+totalPiutangValue()-utang;
-_selfTestAssert(parsePzNum(netEl.textContent)===expected,'Kekayaan Bersih harus = saldo akun + total aset + total piutang − (utang manual + utang tercatat), dapat '+parsePzNum(netEl.textContent)+' vs ekspektasi '+expected);
+_selfTestAssert(parsePzNum(netEl.textContent)===expected,'Kekayaan Bersih harus = saldo akun + total aset + total piutang − (utang manual + utang tercatat + sisa cicilan/paylater), dapat '+parsePzNum(netEl.textContent)+' vs ekspektasi '+expected);
 }
 }},
 {name:'Regresi bug ID string vs number: pencarian & hapus di Aset/Piutang/Kekayaan/SIM/Zakat (sementara, tidak disimpan)', fn:()=>{
@@ -2338,6 +2338,10 @@ function saveDebt(){return Debt.save();}
 async function delDebt(id){return Debt.delete(id);}
 function totalDebtValue(){return Debt.totalValue();}
 function totalDebtCicilanBulanan(){return Debt.totalCicilanBulanan();}
+// Sisa kewajiban cicilan/paylater (kind:'cicilan' di D.bills) yg belum lunas — TERPISAH dari Buku Utang (D.debts).
+// Dipakai bareng totalDebtValue() di semua tempat yg hitung "total utang" (Kekayaan Bersih, Zakat Maal, AI widget,
+// FI.totalDebt()) supaya konsisten, krn cicilan/paylater juga kewajiban riil yg harus ikut dikurangi dari kekayaan.
+function totalCicilanOutstanding(){return(typeof getBillStats==='function'?getBillStats().outstanding:0)||0;}
 /* moved to modules-render.js: renderDebtList */
 function setDebtStrategyMethod(m){return DebtStrategy.setMethod(m);}
 function onDsExtraInput(){return DebtStrategy.onExtraInput();}

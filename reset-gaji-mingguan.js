@@ -72,6 +72,9 @@ const catName=gajiCat?gajiCat.name:(D.categories.income[0]?D.categories.income[0
 D.transactions.push({id:uid(),type:'income',amount:_wrLastTotal,category:catName,subcategory:'',accountId:accId,payMethod:'tunai',note:`Gaji mingguan dari absensi (${_wrLastCount} hari kerja, ${dateToISO(start)} s/d ${dateToISO(end)})`,date:dateToISO(now)});
 incomeSaved=true;
 }
+if(!Array.isArray(D.gajiMingguanHistory))D.gajiMingguanHistory=[];
+D.gajiMingguanHistory.push({weekStart:dateToISO(start),weekEnd:dateToISO(end),total:_wrLastTotal,count:_wrLastCount,resetDate:todayStr(),incomeSaved});
+if(D.gajiMingguanHistory.length>26) D.gajiMingguanHistory=D.gajiMingguanHistory.slice(-26);
 D.workDays=D.workDays.filter(w=>{const d=new Date(w.date);return !(d>=start&&d<=end);});
 toast(incomeSaved?`✅ Absensi direset & ${fmtFull(_wrLastTotal)} dicatat sebagai Pemasukan! 🎉`:'✅ Absensi minggu ini direset, selamat gajian! 🎉');
 } else {

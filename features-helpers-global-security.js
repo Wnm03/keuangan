@@ -28,8 +28,8 @@ if(location.hostname==='localhost'||location.hostname==='127.0.0.1')return true;
 }catch(e){ /* anggap bukan dev mode kalau gagal deteksi */ }
 return false;
 }
-const APP_BUILD_VERSION = 'kw80-merge-advisor-card-dashcards-48';
-const PRODUCTION_BUILD_SYNCED_VERSION = 'kw80-merge-advisor-card-dashcards-48';
+const APP_BUILD_VERSION = 'kw80-absensi-pending-badge-avg-gaji-fincoach';
+const PRODUCTION_BUILD_SYNCED_VERSION = 'kw80-absensi-pending-badge-avg-gaji-fincoach';
 let D = {
 schemaVersion:SCHEMA_VERSION,
 transactions:[],cobek:[],products:[],produsen:[],cobekKategori:JSON.parse(JSON.stringify(DEFAULT_COBEK_KATEGORI)),targets:[],eduFunds:[],reminders:[],bills:[],billsArchive:[],
@@ -41,7 +41,7 @@ categories:{income:JSON.parse(JSON.stringify(DEFAULT_CATS.income)),expense:JSON.
 accounts:JSON.parse(JSON.stringify(DEFAULT_ACCOUNTS)),
 vehicles:[{id:'veh_1',name:'Vario 125',emoji:'🏍️',serviceIntervalKm:3000}],
 simList:[],
-bbmLogs:[],servisLogs:[],jalanLogs:[],kmLogs:[],workDays:[],
+bbmLogs:[],servisLogs:[],jalanLogs:[],kmLogs:[],workDays:[],gajiMingguanHistory:[],
 tukangBorHargaMemory:{},
 tukangWorkers:[],
 tukangAbsensi:[],
@@ -356,6 +356,7 @@ if(!D.sparepartCats||!D.sparepartCats.length) D.sparepartCats=JSON.parse(JSON.st
 D.sparepartCats.forEach(c=>{if(!c.code)c.code=codeFromName(c.name);});
 if(!D.partsStock) D.partsStock=[];
 if(!D.workDays) D.workDays=[];
+if(!D.gajiMingguanHistory) D.gajiMingguanHistory=[];
 if(!D.tukangWorkers) D.tukangWorkers=[];
 if(!D.tukangAbsensi) D.tukangAbsensi=[];
 if(!D.aiWidgetReport) D.aiWidgetReport=null;

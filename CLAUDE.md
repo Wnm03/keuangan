@@ -60,6 +60,35 @@ guard baru di `build.js` (pola: `lintXxx()` yang dipanggil di `main()` dan
 `process.exit(1)` kalau ketemu) supaya build gagal keras kalau bug itu balik
 lagi — bukan cuma mengandalkan komentar `// BUGFIX:` yang bisa hilang saat di-diff/revert.
 
+## Upload dari HP (tanpa CLI) — WAJIB kalau tidak pakai `npm run release`
+
+Kalau update dikirim ke GitHub lewat upload manual di HP (GitHub mobile
+app/web, tanpa akses terminal/git), `npm run release` tidak bisa dijalankan.
+Supaya 2 insiden lama (file source ketinggalan, patch dari base basi) tidak
+terulang lewat jalur ini, WAJIB ikuti:
+
+1. **Selalu lewat branch baru + Pull Request, jangan langsung upload ke
+   `main`.** Buka PR, biarkan CI (`npm run check` dari `.github/workflows/ci.yml`)
+   jalan otomatis — ini pengganti `npm run release` yang tidak bisa jalan di HP.
+2. **Jangan merge PR sebelum status check CI hijau.** Jangan tergesa-gesa
+   merge dari HP sebelum centang hijau muncul di PR.
+3. **Cocokkan jumlah & nama file sebelum upload** dengan isi commit terakhir
+   di `kw/` (terutama `*.js` di root, bukan di `backups/`/`archive/`) — supaya
+   file yang "ketinggalan" ketahuan sebelum upload, bukan sesudah.
+4. **Jangan upload `kw/backups/` atau `kw/archive/` secara manual.** Upload
+   lewat GitHub app tidak otomatis skip file yang di-gitignore seperti
+   `git add` — file di dua folder ini harus dikeluarkan manual dari daftar
+   yang diupload/ditimpa.
+5. **Jangan edit `app-bundle-a.min.js` / `app-bundle-b.min.js` langsung** di
+   editor GitHub mobile. File ini hasil build otomatis — edit source-nya,
+   biarkan CI/`build.js` yang generate ulang bundle.
+6. **Tulis di pesan commit: asal upload & versi/build dasar**, misal
+   `"upload dari Claude mobile, base build #173"` — supaya kalau ternyata
+   base-nya stale, gampang dilacak (persis insiden ke-2 di atas).
+7. **Setelah merge, cek `FILE-MAP.md` ikut ter-update otomatis oleh CI** —
+   ini bukti build step benar-benar jalan, bukan cuma file mentah ketimpa
+   manual.
+
 ## CI & branch protection
 `.github/workflows/ci.yml` menjalankan `npm run check` (termasuk
 `--require-minify`, lihat catatan esbuild di bawah) di setiap push & PR.

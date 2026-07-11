@@ -102,7 +102,7 @@ return null;
 }
 function scanReceipt(amtId,dateId,noteId){
 const inp=document.createElement('input');
-inp.type='file'; inp.accept='image/*'; inp.capture='environment';
+inp.type='file'; inp.accept='image/*';
 inp.onchange=async(e)=>{
 const file=e.target.files[0]; if(!file)return;
 toast('🔍 Memindai gambar, mohon tunggu...',6000);
@@ -112,13 +112,12 @@ const text=result&&result.data?result.data.text:'';
 const rawNums=text.match(/\d{1,3}(?:[.,]\d{3})+(?:[.,]\d{1,2})?|\d{4,}/g)||[];
 const nums=rawNums.map(s=>parseFloat(s.replace(/[.,](?=\d{3}(\D|$))/g,'').replace(',','.'))).filter(n=>n>=500&&n<500000000);
 if(nums.length&&amtId){const amt=Math.round(Math.max(...nums));const el=document.getElementById(amtId);if(el){el.value=amt;if(el.oninput)el.oninput();}}
-if(dateId){
-const iso=extractDateFromText(text);
-if(iso){const el=document.getElementById(dateId);if(el)el.value=iso;}
-}
+const isoForBill=extractDateFromText(text);
+if(dateId&&isoForBill){const el=document.getElementById(dateId);if(el)el.value=isoForBill;}
 const firstLine=text.split('\n').map(l=>l.trim()).find(l=>l.length>3&&!/^\d+$/.test(l));
 if(firstLine){const el=document.getElementById(noteId);if(el)el.value=firstLine.slice(0,60);}
 toast(nums.length?'✅ Scan selesai, cek & koreksi hasilnya':'⚠️ Nominal tidak terbaca, isi manual ya');
+await maybeOfferPaylaterReminder(text,nums.length?Math.round(Math.max(...nums)):null,isoForBill);
 }catch(err){
 toast('❌ Gagal scan: '+scanErrorMessage(err));
 }
@@ -140,7 +139,7 @@ return null;
 }
 function scanBuktiTransfer(nameId,amtId,dateId){
 const inp=document.createElement('input');
-inp.type='file'; inp.accept='image/*'; inp.capture='environment';
+inp.type='file'; inp.accept='image/*';
 inp.onchange=async(e)=>{
 const file=e.target.files[0]; if(!file)return;
 toast('🔍 Memindai bukti transfer, mohon tunggu...',6000);
@@ -165,7 +164,7 @@ inp.click();
 }
 function scanTanggalDariFoto(dateId){
 const inp=document.createElement('input');
-inp.type='file'; inp.accept='image/*'; inp.capture='environment';
+inp.type='file'; inp.accept='image/*';
 inp.onchange=async(e)=>{
 const file=e.target.files[0]; if(!file)return;
 toast('🔍 Memindai foto, mohon tunggu...',6000);
@@ -188,7 +187,7 @@ inp.click();
 }
 function scanKmOdometer(){
 const inp=document.createElement('input');
-inp.type='file'; inp.accept='image/*'; inp.capture='environment';
+inp.type='file'; inp.accept='image/*';
 inp.onchange=async(e)=>{
 const file=e.target.files[0]; if(!file)return;
 toast('🔍 Memindai foto odometer, mohon tunggu...',6000);
@@ -427,7 +426,7 @@ toast('✅ '+escapeHtml(a.name)+' diupdate ke '+fmtFull(n));
 }
 function scanReceiptBelanja(){
 const inp=document.createElement('input');
-inp.type='file'; inp.accept='image/*'; inp.capture='environment';
+inp.type='file'; inp.accept='image/*';
 const insightEl=document.getElementById('txScanInsight');
 if(insightEl){insightEl.style.display='none';insightEl.innerHTML='';}
 inp.onchange=async(e)=>{
@@ -440,8 +439,9 @@ const rawNums=text.match(/\d{1,3}(?:[.,]\d{3})+(?:[.,]\d{1,2})?|\d{4,}/g)||[];
 const nums=rawNums.map(s=>parseFloat(s.replace(/[.,](?=\d{3}(\D|$))/g,'').replace(',','.'))).filter(n=>n>=500&&n<500000000);
 let amt=0;
 if(nums.length){amt=Math.round(Math.max(...nums));const el=document.getElementById('txAmt');if(el){el.value=amt;if(el.oninput)el.oninput();}}
+let isoDate=null;
 const dm=text.match(/(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})/);
-if(dm){let[,d,m,y]=dm;if(y.length===2)y='20'+y;const iso=`${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;if(!isNaN(new Date(iso).getTime())){const el=document.getElementById('txDate');if(el)el.value=iso;}}
+if(dm){let[,d,m,y]=dm;if(y.length===2)y='20'+y;const iso=`${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;if(!isNaN(new Date(iso).getTime())){isoDate=iso;const el=document.getElementById('txDate');if(el)el.value=iso;}}
 const firstLine=text.split('\n').map(l=>l.trim()).find(l=>l.length>3&&!/^\d+$/.test(l));
 if(firstLine){const el=document.getElementById('txNote');if(el)el.value=firstLine.slice(0,60);}
 const guessedCat=guessCategoryFromReceiptText(text);
@@ -471,6 +471,7 @@ toast(nums.length?'✅ Scan selesai, cek & koreksi hasilnya. Nama sparepart tida
 } else {
 toast(nums.length?'✅ Scan selesai, cek & koreksi hasilnya':'⚠️ Nominal tidak terbaca, isi manual ya');
 }
+await maybeOfferPaylaterReminder(text,amt||null,isoDate);
 }catch(err){
 toast('❌ Gagal scan: '+scanErrorMessage(err));
 }
@@ -659,6 +660,45 @@ if(tenor&&tenor<=60&&!isNaN(perBulan)&&perBulan>=10000)return{tenor,perBulan:Mat
 }
 return null;
 }
+// Deteksi metode "bayar bulan depan" / paylater SEKALI BAYAR (bukan cicilan
+// multi-bulan yang sudah ditangani CICILAN_PATTERNS di atas) — mis. GoPay
+// Later, ShopeePayLater/Kredivo/Akulaku/Indodana versi bayar penuh di tempo
+// berikutnya (BUKAN dicicil per bulan), atau frasa umum "Bayar Nanti"/
+// "Bayar Bulan Depan"/"Tempo 30 Hari". Kalau ketemu & belum ketangkep pola
+// cicilan di atas, dipakai buat nawarin bikin pengingat 🧾 Tagihan (sekali)
+// lewat maybeOfferPaylaterReminder() di bawah, biar tidak lupa pas ditagih.
+const PAYLATER_DUE_NEXT_MONTH_RE=/(gopay\s*later|shopee\s*pay\s*later|spaylater|paylater|kredivo|akulaku|indodana|bayar\s*(?:nanti|bulan\s*depan)|tempo\s*30\s*hari)/i;
+function detectPaylaterDueNextMonth(text,alreadyCicilan){
+if(alreadyCicilan)return null; // sudah ditangani sbg cicilan multi-bulan, jangan dobel
+const full=String(text);
+const m=full.match(PAYLATER_DUE_NEXT_MONTH_RE);
+if(!m)return null;
+const totalTagihan=guessCheckoutTotalTagihan(full);
+return{label:m[0].trim(),amount:totalTagihan};
+}
+// Setelah scan struk/checkout, kalau kedetek metode bayar-bulan-depan di
+// atas, tawarin bikin pengingat 🧾 Tagihan (sekali, jatuh tempo +1 bulan
+// dari tanggal transaksi/hari ini) lewat askConfirm — supaya nggak kelupaan
+// pas ditagih. fallbackAmt/fallbackDateStr dipakai kalau nominal/tanggal
+// tidak kebaca lewat pola "Total Tagihan" (mis. struknya cuma ada "Total
+// Belanja", bukan "Total Tagihan/Pembayaran/Bayar").
+async function maybeOfferPaylaterReminder(text,fallbackAmt,fallbackDateStr,alreadyCicilan){
+if(typeof askConfirm!=='function'||typeof D==='undefined'||!D.bills)return;
+const paylater=detectPaylaterDueNextMonth(text,!!alreadyCicilan);
+if(!paylater)return;
+const amt=paylater.amount||fallbackAmt;
+if(!amt||amt<=0)return;
+const baseDate=fallbackDateStr&&!isNaN(new Date(fallbackDateStr).getTime())?new Date(fallbackDateStr):new Date();
+const due=new Date(baseDate);due.setMonth(due.getMonth()+1);
+const dueStr=due.toISOString().slice(0,10);
+const amtLabel=typeof fmt==='function'?fmt(amt):('Rp'+amt);
+const ok=await askConfirm('Terdeteksi metode bayar nanti/bulan depan ('+paylater.label+') senilai '+amtLabel+'. Tambahkan pengingat jatuh tempo '+dueStr+' ke 🧾 Tagihan?',{icon:'📅',okText:'✅ Ya, Tambahkan',cancelText:'Tidak Usah',danger:false});
+if(!ok)return;
+D.bills.push({id:uid(),name:'Bayar '+paylater.label,amount:Math.round(amt),nextDue:dueStr,freq:'sekali',category:'',subcategory:'',accountId:(D.accounts&&D.accounts[0])?D.accounts[0].id:null,note:'Otomatis dari hasil scan — cek nominal & tanggal sebelum jatuh tempo',kind:'tagihan',shared:false,sharedPct:null,totalAmount:null});
+save();
+if(typeof refreshBillEverywhere==='function')refreshBillEverywhere();
+toast('🔔 Pengingat tagihan bulan depan ditambahkan (🧾 Tagihan)');
+}
 function scanWorthItCheckout(mode){
 const inp=document.createElement('input');
 inp.type='file'; inp.accept='image/*';
@@ -714,6 +754,7 @@ filled.push('Cicilan '+cicilan.tenor+'x '+fmt(cicilan.perBulan)+'/bln');
 }
 }
 toast(filled.length?'✅ Terisi otomatis: '+filled.join(', ')+' — cek lagi sebelum lanjut':'⚠️ Tidak banyak yang terbaca, isi manual ya');
+await maybeOfferPaylaterReminder(text,harga||null,null,!!cicilan);
 }catch(err){
 toast('❌ Gagal scan: '+scanErrorMessage(err));
 }

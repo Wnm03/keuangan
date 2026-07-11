@@ -230,6 +230,7 @@ function setupZakatMaal(values, D, stubs = {}) {
     totalSaldoAkun: stubs.totalSaldoAkun || (() => 0),
     totalPiutangValue: stubs.totalPiutangValue || (() => 0),
     totalDebtValue: stubs.totalDebtValue || (() => 0),
+    totalCicilanOutstanding: stubs.totalCicilanOutstanding || (() => 0),
   }, ['Zakat']);
   return { ctx, fakeDocument, D };
 }
@@ -308,6 +309,17 @@ test('Zakat.hitungMaal — utang (manual + buku utang) mengurangi total harta, d
   ctx.Zakat.hitungMaal();
   assert.equal(fakeDocument.getElementById('zmTotalHarta').textContent, '0');
   assert.equal(D.pajakZakat.utangJT, 3000000);
+});
+
+test('Zakat.hitungMaal — sisa cicilan/paylater outstanding juga ikut mengurangi total harta', () => {
+  const D = { pajakZakat: { hargaEmasPerGram: 1000000, haulMaalMulai: null }, assets: [] };
+  const { ctx, fakeDocument } = setupZakatMaal(
+    { zmUtang: { value: '0' } },
+    D,
+    { totalSaldoAkun: () => 100000000, totalCicilanOutstanding: () => 30000000 }
+  );
+  ctx.Zakat.hitungMaal();
+  assert.equal(fakeDocument.getElementById('zmTotalHarta').textContent, '70000000');
 });
 
 function setupZakatFitrah(values, D) {

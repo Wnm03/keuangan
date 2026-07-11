@@ -1,5 +1,12 @@
 node_modules/
-backups/
+
+# Snapshot/backup otomatis dari proses build/merge — bukan source of truth,
+# akan terus numpuk tiap kali build kalau ikut di-commit.
+kw/backups/
+
+# Arsip dokumen basi/obsolete
+kw/archive/
+
+# Log & file sementara
 *.log
 .DS_Store
-npm-debug.log*

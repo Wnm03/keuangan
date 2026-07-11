@@ -53,7 +53,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <title>Keluarga W</title>
-<link rel="stylesheet" href="styles.css?v=173">
+<link rel="stylesheet" href="styles.css?v=180">
 <script>
 /* Debug console (Eruda) — aktifkan sekali lewat ?debug=1 di URL, nempel via localStorage.
    Matikan lagi lewat ?debug=0. Tidak aktif buat user biasa. */
@@ -105,8 +105,8 @@ b.appendChild(closeBtn);
 }catch(_e){ console.error('Gagal tampilkan banner error modul:',_e); }
 };
 </script>
-<script src="app-bundle-a.min.js?v=173" onerror="window.__moduleLoadFail('app-bundle-a.min.js')"></script>
-<script src="smoke-test.js?v=173" defer></script>
+<script src="app-bundle-a.min.js?v=180" onerror="window.__moduleLoadFail('app-bundle-a.min.js')"></script>
+<script src="smoke-test.js?v=180" defer></script>
 <link rel="manifest" id="pwaManifestLink" href="manifest.json">
 </head>
 <body data-theme="dark">
@@ -343,6 +343,7 @@ b.appendChild(closeBtn);
       <div class="stat-box"><div class="stat-label">Hari Kerja Minggu Ini</div><div class="stat-val" id="dashAbsensiHariCount">0</div></div>
       <div class="stat-box"><div class="stat-label">Estimasi Gaji Minggu Ini</div><div class="stat-val green" id="dashAbsensiGajiTotal">Rp 0</div></div>
     </div>
+    <div id="dashAbsensiPendingBadge"></div>
     </div>
   </div>
   <div class="grid2">
@@ -412,6 +413,15 @@ b.appendChild(closeBtn);
     <div class="u-flex u-jcb u-aic">
       <span class="u-fs12t2">Saldo bersih</span>
       <span class="stat-val u-pointer" id="mNet" style="font-size:20px" data-action="showFilteredTx" data-args='["keuangan", "all", "\ud83d\udcb0 Saldo Bersih"]' aria-label="Lihat detail transaksi Saldo Bersih">Rp 0</span>
+    </div>
+  </div>
+  <div class="card u-mb12 u-dnone" id="keuAbsensiGajiCard" style="padding:12px 14px">
+    <div class="u-flex u-jcb u-aic">
+      <div>
+        <div class="u-fs12t2">👷 Gaji minggu ini dari Absensi (<span id="keuAbsensiGajiCount">0</span> hari, belum dicatat)</div>
+        <div class="stat-val green" style="font-size:18px;margin-top:2px" id="keuAbsensiGajiTotal">Rp 0</div>
+      </div>
+      <button class="btn btn-income btn-sm" data-action="openWeeklyResetManual">💰 Catat</button>
     </div>
   </div>
   <div class="card u-mb12">
@@ -2103,6 +2113,6 @@ b.appendChild(closeBtn);
 <script>document.write(MODAL_HTML[64]);</script><!-- modal:budgetSettingsModal externalized to modals.js -->
 <script>document.write(MODAL_HTML[65]);</script><!-- modal:refleksiModal (Refleksi & Self-Care) -->
 
-<script src="app-bundle-b.min.js?v=173" onerror="window.__moduleLoadFail('app-bundle-b.min.js')"></script>
+<script src="app-bundle-b.min.js?v=180" onerror="window.__moduleLoadFail('app-bundle-b.min.js')"></script>
 </body>
 </html>

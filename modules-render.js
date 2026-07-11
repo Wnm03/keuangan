@@ -1,7 +1,7 @@
 // Fungsi render (85 fungsi) dipisah dari app_production.html untuk pemerataan ukuran file.
 // Semua fungsi ini murni definisi function global (bukan module), jadi tetap bisa dipanggil dari file manapun
 // yang loadnya belakangan (sama seperti modules-calc.js/features-*.js).
-const MODULE_RENDER_VERSION='kw80-merge-advisor-card-dashcards-48';
+const MODULE_RENDER_VERSION='kw80-absensi-pending-badge-avg-gaji-fincoach';
 
 function renderPageContent(name){
 if(name==='dashboard')renderDashboard();
@@ -694,8 +694,27 @@ function renderFiCatOptions(selected){return FI.renderCatOptions(selected);}
 
 function renderDashDanaDarurat(){return DanaDaruratAI.renderDash();}
 
+// Kartu ringkasan "Gaji minggu ini dari Absensi" di halaman Keuangan — dihitung fresh
+// tiap kali renderKeuangan() jalan dari D.workDays minggu berjalan (sama kayak yg dipakai
+// gajiSyncBox di modal Absensi), supaya user lihat totalnya juga tanpa perlu buka modal
+// Absensi dulu. Disembunyikan (u-dnone) kalau belum ada absensi minggu ini.
+function renderKeuAbsensiGajiCard(){
+const cardEl=document.getElementById('keuAbsensiGajiCard');
+if(!cardEl)return;
+const {start,end}=getWeekRange(new Date());
+const weekDays=(D.workDays||[]).filter(w=>{const d=new Date(w.date);return d>=start&&d<=end;});
+if(weekDays.length){
+const total=weekDays.reduce((s,w)=>s+w.total,0);
+cardEl.classList.remove('u-dnone');cardEl.style.display='block';
+document.getElementById('keuAbsensiGajiCount').textContent=weekDays.length;
+document.getElementById('keuAbsensiGajiTotal').textContent=fmtFull(total);
+} else {
+cardEl.classList.add('u-dnone');cardEl.style.display='none';
+}
+}
 function renderKeuangan(){
 document.getElementById('monthLabel').textContent=MONTHS_FULL[curMonth]+' '+curYear;
+renderKeuAbsensiGajiCard();
 const txM=D.transactions.filter(t=>{const d=new Date(t.date);return d.getMonth()===curMonth&&d.getFullYear()===curYear;});
 const inc=txM.filter(t=>t.type==='income'||t.type==='transfer_in').reduce((s,t)=>s+t.amount,0);
 const exp=txM.filter(t=>t.type==='expense'||t.type==='transfer_out').reduce((s,t)=>s+t.amount,0);

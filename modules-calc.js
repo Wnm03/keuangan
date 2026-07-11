@@ -1,5 +1,5 @@
 
-const MODULE_CALC_VERSION='kw80-merge-advisor-card-dashcards-48';
+const MODULE_CALC_VERSION='kw80-absensi-pending-badge-avg-gaji-fincoach';
 const FI={
 assetScopeState:'zakatable',
 investmentAssetValue(){
@@ -10,7 +10,7 @@ return (D.assets||[]).filter(a=>a.zakatable).reduce((s,a)=>s+(a.nilai||0),0);
 assetFund(){ return totalSaldoAkun()+FI.investmentAssetValue()+totalPiutangValue(); },
 totalDebt(){
 const utangJT=(D.pajakZakat&&D.pajakZakat.utangJT)||0;
-const sisaCicilan=(typeof getBillStats==='function'?getBillStats().outstanding:0)||0;
+const sisaCicilan=(typeof totalCicilanOutstanding==='function'?totalCicilanOutstanding():0)||0;
 const bukuUtang=(typeof totalDebtValue==='function'?totalDebtValue():0)||0;
 return utangJT+sisaCicilan+bukuUtang;
 },
@@ -683,6 +683,23 @@ if(near){
 out.push({id:'target-near-'+near.t.id,level:'good',icon:'🟢',text:`Target "${escapeHtml(near.t.name)}" sudah ${near.pct}% — tinggal sedikit lagi tercapai! 🎉`});
 }
 }catch(e){console.warn('FinCoach: gagal cek target tabungan',e);}
+// 10. v179: hari kerja minggu ini jauh di bawah rata-rata minggu² sebelumnya (dari
+// D.gajiMingguanHistory, dicatat tiap confirmWeeklyReset()) — sinyal dini kalau ada absen/bolos
+// yang mungkin tidak disadari, sebelum kelihatan di gaji minggu depan.
+try{
+if(typeof getWeekRange==='function'&&(D.gajiMingguanHistory||[]).length>=3){
+const hist=D.gajiMingguanHistory.slice(-8);
+const avgCount=hist.reduce((s,h)=>s+(h.count||0),0)/hist.length;
+const {start:wStart,end:wEnd}=getWeekRange(now);
+wEnd.setHours(23,59,59,999);
+const thisWeekCount=(D.workDays||[]).filter(w=>{const d=new Date(w.date);return d>=wStart&&d<=wEnd;}).length;
+const dayOfWeek=now.getDay();
+// hanya tampil kalau sudah pertengahan minggu (Rabu=3) ke atas biar tidak false-alarm di awal minggu
+if(dayOfWeek>=3&&avgCount>=2&&thisWeekCount<avgCount*0.5){
+out.push({id:'wh-lowdays',level:'info',icon:'🔔',text:`Hari kerja minggu ini baru ${thisWeekCount} hari, jauh di bawah rata-rata ${avgCount.toFixed(1)} hari/minggu dari histori — cek lagi Absensi kalau ada yang belum dicatat.`,action:{label:'Cek Absensi',page:'dashboard'}});
+}
+}
+}catch(e){console.warn('FinCoach: gagal cek hari kerja mingguan',e);}
 // Kalau tidak ada satupun sinyal bahaya/peringatan, kasih 1 insight positif biar widget tidak
 // kosong & user tetap tahu semua indikator utama aman (bukan cuma diam kalau memang aman).
 if(!out.some(o=>o.level==='danger'||o.level==='warning')&&inc>0){
@@ -825,7 +842,7 @@ const saldoAkun=totalSaldoAkun();
 const totalAset=totalAssetValue();
 const totalPiutang=totalPiutangValue();
 const utangManual=D.pajakZakat.utangJT||parsePzNum(document.getElementById('zmUtang')?document.getElementById('zmUtang').value:0);
-const utang=utangManual+totalDebtValue();
+const utang=utangManual+totalDebtValue()+totalCicilanOutstanding();
 const netWorth=saldoAkun+totalAset+totalPiutang-utang;
 document.getElementById('kbSaldoAkun').textContent=fmtFull(saldoAkun);
 document.getElementById('kbTotalAset').textContent=fmtFull(totalAset);

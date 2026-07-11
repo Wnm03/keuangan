@@ -90,7 +90,7 @@ const piutangZakatable=totalPiutangValue();
 const utangManual=parsePzNum(document.getElementById('zmUtang').value);
 pz.utangJT=utangManual; save();
 renderKekayaanBersih();
-const utang=utangManual+totalDebtValue();
+const utang=utangManual+totalDebtValue()+totalCicilanOutstanding();
 const totalHarta=Math.max(0,saldoAkun+asetZakatable+piutangZakatable-utang);
 const nisab=85*pz.hargaEmasPerGram;
 document.getElementById('zmTotalHarta').textContent=fmtFull(totalHarta);

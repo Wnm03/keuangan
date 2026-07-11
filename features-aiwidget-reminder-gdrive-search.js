@@ -183,7 +183,7 @@ const zpWajib=inc>=pz.nisabPenghasilanBulan;
 const zpJumlah=zpWajib?Math.round(inc*0.025):0;
 const zpInfo=`Zakat Penghasilan bulan ini: pemasukan ${fmtFull(inc)} vs nisab ${fmtFull(pz.nisabPenghasilanBulan)} → ${zpWajib?'✅ WAJIB zakat '+fmtFull(zpJumlah):'⬜ belum wajib (di bawah nisab)'}`;
 const asetZakatable=(D.assets||[]).filter(a=>a.zakatable).reduce((s,a)=>s+(a.nilai||0),0);
-const totalHartaZakat=Math.max(0,totalSaldoAkun()+asetZakatable-(pz.utangJT||0)-totalDebtValue());
+const totalHartaZakat=Math.max(0,totalSaldoAkun()+asetZakatable-(pz.utangJT||0)-totalDebtValue()-totalCicilanOutstanding());
 const nisabMaal=85*pz.hargaEmasPerGram;
 const cukupNisabMaal=totalHartaZakat>=nisabMaal;
 let haulInfo='belum mencapai nisab';
@@ -234,7 +234,7 @@ if(a.hargaBeli!=null)s+=`, harga beli/unit ${a.hargaBeli}`;
 return s;
 }).join('; '):'Belum ada aset tercatat';
 const asetListInfo=wantAsetDetail?asetListInfoFull:((D.assets||[]).length?`${D.assets.length} aset tercatat (ringkasan — tanya lebih spesifik utk detail per aset)`:'Belum ada aset tercatat');
-const netWorth=totalSaldoAkun()+totalAsetNilai-(pz.utangJT||0)-totalDebtValue();
+const netWorth=totalSaldoAkun()+totalAsetNilai-(pz.utangJT||0)-totalDebtValue()-totalCicilanOutstanding();
 let fiInfo='Belum ada data transaksi yang cukup untuk hitung Kebebasan Finansial.';
 try{
 if(typeof fiGetAssumptions==='function'&&D.transactions&&D.transactions.length){
@@ -435,7 +435,7 @@ function aiErrorHint(provider,status){
 if(provider==='gemini')return(status===400||status===403)?' (cek API key di Pengaturan)':'';
 return status===401?' (API key salah/expired, cek di Pengaturan)':'';
 }
-// Advisor — pengatur tab utk card gabungan "🧭 Penasihat" (v124, kw80-merge-advisor-card-dashcards-48):
+// Advisor — pengatur tab utk card gabungan "🧭 Penasihat" (v124, kw80-absensi-pending-badge-avg-gaji-fincoach):
 // dulu FinCoach ("🩺 Insight Cepat", rule-based-gratis-instan) & AIWidget ("🔍 Laporan AI",
 // panggil Claude/Gemini, wajib API key) tampil sbg 2 card TERPISAH di Dashboard — sekarang
 // digabung jadi SATU card dgn 2 tab, supaya tidak terasa ada "2 penasihat AI" yang mirip2.
@@ -469,7 +469,7 @@ const inc=txM.filter(t=>t.type==='income').reduce((s,t)=>s+t.amount,0);
 const exp=txM.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0);
 const accInfo=D.accounts.map(a=>`${escapeHtml(a.name)}: ${fmtFull(recalcAccBalance(a.id))}`).join(', ')||'Belum ada akun';
 let netWorth=0;
-try{ netWorth=totalSaldoAkun()+totalAssetValue()-((D.pajakZakat&&D.pajakZakat.utangJT)||0)-totalDebtValue(); }catch(e){}
+try{ netWorth=totalSaldoAkun()+totalAssetValue()-((D.pajakZakat&&D.pajakZakat.utangJT)||0)-totalDebtValue()-totalCicilanOutstanding(); }catch(e){}
 const cobekOmzet=D.cobek.reduce((s,t)=>s+(t.total||0),0);
 const cobekProfit=D.cobek.reduce((s,t)=>s+(t.profit||0),0);
 const cobekThisMonth=D.cobek.filter(t=>{const d=new Date(t.date);return d.getMonth()===m&&d.getFullYear()===y;});
@@ -477,6 +477,29 @@ const cobekOmzetBulan=cobekThisMonth.reduce((s,t)=>s+(t.total||0),0);
 const cobekProfitBulan=cobekThisMonth.reduce((s,t)=>s+(t.profit||0),0);
 const whThisMonth=D.workDays.filter(w=>{const d=new Date(w.date);return d.getMonth()===m&&d.getFullYear()===y;});
 const gajiBulan=whThisMonth.reduce((s,w)=>s+(w.total||0),0);
+// v179: total gaji minggu ini dihitung dari Absensi (D.workDays, in/out harian) — BUKAN dari
+// transaksi Keuangan — biar AI juga bisa lihat progres gaji minggu berjalan (belum tentu sudah
+// dicatat sbg pemasukan di Keuangan kalau minggunya belum "gajian"/reset).
+let gajiMinggu=0,whCountMinggu=0;
+try{
+const{start:wStart,end:wEnd}=getWeekRange(new Date());
+wEnd.setHours(23,59,59,999);
+const whThisWeek=(D.workDays||[]).filter(w=>{const d=new Date(w.date);return d>=wStart&&d<=wEnd;});
+gajiMinggu=whThisWeek.reduce((s,w)=>s+(w.total||0),0);
+whCountMinggu=whThisWeek.length;
+}catch(e){console.warn('AIWidget: gagal hitung gaji minggu ini',e);}
+// v179: rata-rata gaji mingguan dari histori beberapa minggu terakhir (D.gajiMingguanHistory,
+// dicatat otomatis tiap kali confirmWeeklyReset() dijalankan) — biar AI bisa lihat variabilitas
+// pendapatan harian/mingguan dari waktu ke waktu, bukan cuma angka minggu ini yang bisa naik-turun
+// tergantung jumlah hari kerja.
+let avgGajiMingguan=0,gajiMingguanHistCount=0;
+try{
+const hist=(D.gajiMingguanHistory||[]).slice(-8);
+if(hist.length){
+avgGajiMingguan=Math.round(hist.reduce((s,h)=>s+(h.total||0),0)/hist.length);
+gajiMingguanHistCount=hist.length;
+}
+}catch(e){console.warn('AIWidget: gagal hitung rata-rata gaji mingguan',e);}
 let fiInfo='Belum cukup data transaksi utk hitung Kebebasan Finansial.';
 try{
 if(typeof fiGetAssumptions==='function'&&D.transactions&&D.transactions.length){
@@ -514,7 +537,7 @@ const totalAset=totalAssetValue();
 asetInfo=`Total ${fmtFull(totalAset)} dari ${D.assets.length} aset (${D.assets.map(a=>a.name+' '+fmtFull(a.nilai)).join(', ')})`;
 }
 }catch(e){}
-return{m,y,inc,exp,accInfo,netWorth,cobekOmzet,cobekProfit,cobekOmzetBulan,cobekProfitBulan,gajiBulan,whCount:whThisMonth.length,fiInfo,debtInfo,billInfo,budgetInfo,lifeBalanceInfo,targetInfo,asetInfo};
+return{m,y,inc,exp,accInfo,netWorth,cobekOmzet,cobekProfit,cobekOmzetBulan,cobekProfitBulan,gajiBulan,whCount:whThisMonth.length,gajiMinggu,whCountMinggu,avgGajiMingguan,gajiMingguanHistCount,fiInfo,debtInfo,billInfo,budgetInfo,lifeBalanceInfo,targetInfo,asetInfo};
 },
 buildSystemPrompt(c){
 return `Kamu adalah PENASIHAT KEUANGAN, BISNIS & INVESTASI, sekaligus WORK-LIFE COACH pribadi untuk ${D.profile.nama||'pengguna'} (pakai data aplikasi keuangan keluarga miliknya).
@@ -549,6 +572,8 @@ ASET & INVESTASI: ${c.asetInfo}
 
 KERJA & POLA HIDUP:
 - Gaji harian/absensi bulan ini: ${fmtFull(c.gajiBulan)} dari ${c.whCount} hari kerja tercatat
+- Gaji harian/absensi MINGGU INI (belum tentu sudah dicatat sbg Pemasukan di Keuangan): ${fmtFull(c.gajiMinggu)} dari ${c.whCountMinggu} hari kerja tercatat
+${c.gajiMingguanHistCount?`- Rata-rata gaji mingguan dari ${c.gajiMingguanHistCount} minggu terakhir yang sudah di-reset/gajian: ${fmtFull(c.avgGajiMingguan)}/minggu (pakai ini utk lihat naik-turun pendapatan, bukan cuma angka minggu ini)`:''}
 - ${c.lifeBalanceInfo}`;
 },
 async generate(){

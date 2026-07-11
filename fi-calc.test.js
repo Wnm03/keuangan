@@ -18,6 +18,7 @@ function makeFI(D, stubs = {}) {
     totalPiutangValue: stubs.totalPiutangValue || (() => 0),
     totalDebtValue: stubs.totalDebtValue || (() => 0),
     getBillStats: stubs.getBillStats || (() => ({ outstanding: 0 })),
+    totalCicilanOutstanding: stubs.totalCicilanOutstanding || (() => 0),
     totalAssetValue: stubs.totalAssetValue || (() => 0),
     // Default meniru perilaku ASLI Budget.matchesTx (features-budget-laporan-carnotes-pelanggan.js):
     // budget dgn catIds ['__total__'] (dipakai FI.annualExpense saat belum ada
@@ -116,7 +117,7 @@ test('FI.assetFund — jumlah saldo akun + aset investasi zakatable + piutang', 
 test('FI.totalDebt — jumlah utang jangka pendek + sisa cicilan tagihan + buku utang', () => {
   const D = { pajakZakat: { utangJT: 5000000 } };
   const FI = makeFI(D, {
-    getBillStats: () => ({ outstanding: 3000000 }),
+    totalCicilanOutstanding: () => 3000000,
     totalDebtValue: () => 2000000,
   });
   assert.equal(FI.totalDebt(), 10000000);
@@ -243,6 +244,7 @@ function makeFIWithDom(D, stubs = {}, domValues = {}, queryGroups = {}) {
     totalPiutangValue: stubs.totalPiutangValue || (() => 0),
     totalDebtValue: stubs.totalDebtValue || (() => 0),
     getBillStats: stubs.getBillStats || (() => ({ outstanding: 0 })),
+    totalCicilanOutstanding: stubs.totalCicilanOutstanding || (() => 0),
     totalAssetValue: stubs.totalAssetValue || (() => 0),
     budgetMatchesTx: stubs.budgetMatchesTx || ((budget, t) => t.type === 'expense'),
   }, ['FI']);

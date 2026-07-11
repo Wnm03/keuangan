@@ -11,8 +11,8 @@
 > file tapi lupa `node build.js`), jalankan ulang generatornya, JANGAN diedit
 > tangan — editan manual bakal ketimpa lagi di build berikutnya.
 
-Terakhir digenerate: 2026-07-11T07:47:23.114Z
-Total file source: 50 · Total identifier global: 852
+Terakhir digenerate: 2026-07-11T09:12:07.135Z
+Total file source: 50 · Total identifier global: 857
 
 ## 1. Urutan load & ringkasan tiap file
 
@@ -21,9 +21,9 @@ bundler menggabungkan semua file jadi `app-bundle-a.min.js`/`app-bundle-b.min.js
 
 | # | File | Baris | Ringkasan |
 |---|------|------:|-----------|
-| 1 | `modules-render.js` | 1370 | Fungsi render (85 fungsi) dipisah dari app_production.html untuk pemerataan ukuran file. Semua fungsi ini murni definisi function global (bukan module), jadi tetap bisa dipanggil dari file manapun yang loadnya … |
+| 1 | `modules-render.js` | 1389 | Fungsi render (85 fungsi) dipisah dari app_production.html untuk pemerataan ukuran file. Semua fungsi ini murni definisi function global (bukan module), jadi tetap bisa dipanggil dari file manapun yang loadnya … |
 | 2 | `modals.js` | 7 | Modal HTML dipisah dari app_production.html untuk pemerataan ukuran file. Setiap elemen array persis sama dengan blok <div class="overlay" id="...">...</div> aslinya, di-inject balik ke posisi yang sama persis via … |
-| 3 | `modules-calc.js` | 839 | _(tidak ada komentar header)_ |
+| 3 | `modules-calc.js` | 856 | _(tidak ada komentar header)_ |
 | 4 | `cobek.js` | 1262 | Domain Cobek: etalase/stok produk, produsen, order pelanggan, laporan omzet, data pelanggan, widget dashboard "🤖 Rekomendasi Harga Jual AI" (PriceRekoWidget, kw73) & "📦 Rekomendasi Restock AI" (StockRekoWidget, kw74) … |
 | 5 | `kasir.js` | 222 | Modul "🧠 Kasir AI" (v127, kw81-kasir-ai-pos): Tab checkout BARU utk halaman Bisnis Shop yang lebih cepat dari form "Transaksi Manual" (Order) lama: tap produk langsung dari grid (bukan pilih dari dropdown lalu klik "+ … |
 | 6 | `piutang-utang.js` | 352 | Domain Piutang & Utang: catatan piutang (uang dipinjamkan), utang (uang dipinjam) beserta status lunas/cicilan, dan DebtStrategy (simulasi strategi pelunasan Avalanche/Snowball). Juga berisi Bill (helper hubungkan … |
@@ -37,7 +37,7 @@ bundler menggabungkan semua file jadi `app-bundle-a.min.js`/`app-bundle-b.min.js
 | 14 | `aset.js` | 351 | Domain Aset & Kekayaan: ALOKASI_PRESETS/AlokasiAset (rekomendasi alokasi dana), Aset (Buku Aset & Kekayaan Bersih), IDBStore (helper generik penyimpanan IndexedDB), PORTFOLIO_LABELS, TimelineW (timeline tujuan keuangan) … |
 | 15 | `worthit.js` | 468 | Domain Worth It? & Prioritas Belanja: cek kondisi keuangan sebelum belanja + daftar prioritas barang yang mau dibeli CATATAN: modul WorthIt dipindah ke file baru ini dari features-renovasi-pajak-aset-order.js (v62). … |
 | 16 | `data-default.js` | 36 | Domain Data Default: kategori cobek bawaan (DEFAULT_COBEK_KATEGORI), akun keuangan bawaan (DEFAULT_ACCOUNTS), kategori sparepart kendaraan bawaan (DEFAULT_SPAREPARTS). PENTING: file ini HARUS dimuat SEBELUM … |
-| 17 | `features-helpers-global-security.js` | 456 | Helper global (migrasi data, state D, save/load, event dispatcher) CATATAN: 3 konstanta default (DEFAULT_COBEK_KATEGORI/DEFAULT_ACCOUNTS/DEFAULT_SPAREPARTS) dipindah ke data-default.js (v79) — file itu HARUS dimuat … |
+| 17 | `features-helpers-global-security.js` | 457 | Helper global (migrasi data, state D, save/load, event dispatcher) CATATAN: 3 konstanta default (DEFAULT_COBEK_KATEGORI/DEFAULT_ACCOUNTS/DEFAULT_SPAREPARTS) dipindah ke data-default.js (v79) — file itu HARUS dimuat … |
 | 18 | `diagnostik-versi.js` | 77 | Domain Diagnostik & Sinkronisasi Versi: snapshot HTML utk self-test (getHtmlSnapshotForSelfTest), cek status sinkron versi produksi vs master (computeProductionSyncStatus), cek status sinkron versi antar file modul … |
 | 19 | `format-tema.js` | 34 | Domain Format Angka & Tema: format rupiah singkat (fmt, mis. "Rp 1.5 jt"), format rupiah penuh (fmtFull/fmtFullSigned), notifikasi toast di bawah layar (toast), dan ganti/terapkan tema warna app termasuk mode "auto" … |
 | 20 | `error-handler.js` | 38 | Domain Error Handler Global: tangkap error tak tertangani (uncaught error & unhandled promise rejection) di seluruh app, catat ke console utk debugging, dan tampilkan toast singkat yang ramah ke pengguna (dibatasi … |
@@ -45,12 +45,12 @@ bundler menggabungkan semua file jadi `app-bundle-a.min.js`/`app-bundle-b.min.js
 | 22 | `keamanan-pin.js` | 205 | Domain Keamanan: layar PIN (showPinScreen/checkPin/pinPress/pinBack/updatePinDots), lockout percobaan PIN salah (PIN_MAX_ATTEMPTS/PIN_LOCK_DURATIONS_SEC/updatePinLockUI/dst), ganti PIN (gantiPin), dan enkripsi API key … |
 | 23 | `refleksi-selfcare.js` | 255 | Domain Refleksi & Self-Care: Jurnal Syukur, Checklist Self-Care harian (dgn hitung konsisten berturut-turut), & Catatan Privat terenkripsi (pakai PIN aplikasi, skema kripto sama dgn … |
 | 24 | `modal-navigasi.js` | 285 | Domain Modal Generik & Navigasi Halaman: modal konfirmasi/prompt/pilihan/info/pin (askConfirm/showPromptModal/showChoiceModal/showAlertModal/showPinPromptModal & pasangan _xxxAnswer/_xxxSubmit-nya), buka/tutup modal & … |
-| 25 | `reset-gaji-mingguan.js` | 87 | Domain Reset Gaji Mingguan: hitung rentang minggu berjalan (getWeekRange), deteksi & tawarkan reset absensi tiap Sabtu (checkWeeklySalaryReset), buka modal reset manual (openWeeklyResetManual), dan proses konfirmasi … |
+| 25 | `reset-gaji-mingguan.js` | 90 | Domain Reset Gaji Mingguan: hitung rentang minggu berjalan (getWeekRange), deteksi & tawarkan reset absensi tiap Sabtu (checkWeeklySalaryReset), buka modal reset manual (openWeeklyResetManual), dan proses konfirmasi … |
 | 26 | `debug-console.js` | 49 | Domain Debug Console: toggle tombol status (updateDebugConsoleBtn) & aktifkan/matikan panel debug pihak ketiga "eruda" (toggleDebugConsole), termasuk lazy-load skrip eruda dari CDN kalau belum pernah dipakai. Dipindah … |
 | 27 | `pengaturan-search.js` | 73 | Domain Pencarian Pengaturan: buka/tutup grup pengaturan (toggleStgGroup), cari & sorot kartu pengaturan yang cocok teks pencarian (stgSearch), dan dukungan keyboard (Enter/Spasi) utk buka grup pengaturan lewat kepala … |
 | 28 | `onboarding.js` | 41 | Domain Onboarding: preview perkiraan kasar gaji/kiriman saat setup awal (updateOnboardPreview) & proses selesai onboarding — simpan profil awal + PIN (finishOnboard). Dipindah dari features-helpers-global-security.js … |
 | 29 | `kalkulator-input.js` | 141 | Kalkulator ekspresi angka: parser aman (safeCalc), popup kalkulator (openCalc/calcPress/dst), dan preview nilai input jumlah (calcPreviewValue/updateAmtPreview/evalAmtExpr). Dipindah dari … |
-| 30 | `scan-ocr.js` | 723 | Scan struk belanja (OCR): struk belanja, bukti transfer, tanggal dari foto, odometer, portofolio aset, kategori & sparepart otomatis dari struk Domain terakhir hasil pembedahan features-filter-scanstruk-ocr.js (v84-v87 … |
+| 30 | `scan-ocr.js` | 764 | Scan struk belanja (OCR): struk belanja, bukti transfer, tanggal dari foto, odometer, portofolio aset, kategori & sparepart otomatis dari struk Domain terakhir hasil pembedahan features-filter-scanstruk-ocr.js (v84-v87 … |
 | 31 | `filter-laporan.js` | 221 | Filter transaksi/keuangan (panel filter Keuangan & Laporan), pencarian, paginasi list transaksi, navigasi antar-list (goToList/showFilteredTx) PENTING: file ini HARUS dimuat sesuai urutan build.js (GROUP_A/GROUP_B) … |
 | 32 | `akun.js` | 112 | Kelola Akun (Cash/Bank/Ewallet dll): saldo, filter dropdown akun di seluruh app, CRUD akun PENTING: file ini HARUS dimuat sesuai urutan build.js (GROUP_A/GROUP_B) karena beberapa modul saling referensi. Urutan grup ini: … |
 | 33 | `gaji-calc.js` | 45 | Kalkulator gaji harian/borongan (Tukang & karyawan lepas), catat sbg pemasukan PENTING: file ini HARUS dimuat sesuai urutan build.js (GROUP_A/GROUP_B) karena beberapa modul saling referensi. Urutan grup ini: … |
@@ -61,16 +61,16 @@ bundler menggabungkan semua file jadi `app-bundle-a.min.js`/`app-bundle-b.min.js
 | 38 | `tx-cobek.js` | 29 | domain "Stok/Penjualan Cobek (Shop)" pada form Transaksi. Dipindah dari transaksi.js (lihat CLAUDE.md catatan kerja "split transaksi.js" bagian ke-9) -- tetap fungsi global, tetap dipanggil persis sama dari sini … |
 | 39 | `tx-target.js` | 68 | domain "Target Tabungan" (modal tambah target, deteksi Dana Darurat, simpan, lihat transaksi akun terkait, tambah/hapus progres). Dipindah dari transaksi.js (lihat CLAUDE.md catatan kerja "split transaksi.js" bagian … |
 | 40 | `tx-list-cashflow.js` | 160 | domain "List Transaksi (kartu tx, hapus tx), filter periode Keuangan/Laporan, & Cashflow Forecast". Dipindah dari transaksi.js (lihat CLAUDE.md catatan kerja "split transaksi.js" bagian ke-11 -- lanjutan bagian … |
-| 41 | `transaksi.js` | 730 | Form Tambah/Edit Transaksi Keuangan: autocomplete kategori/produk, panel kendaraan (BBM/sparepart/stok cobek), target Dana Darurat, catatan/reminder/ transfer, dan simpan transaksi (saveTx) — mesin utama halaman … |
+| 41 | `transaksi.js` | 745 | Form Tambah/Edit Transaksi Keuangan: autocomplete kategori/produk, panel kendaraan (BBM/sparepart/stok cobek), target Dana Darurat, catatan/reminder/ transfer, dan simpan transaksi (saveTx) — mesin utama halaman … |
 | 42 | `profil-pengaturan.js` | 82 | Profil pengguna di Pengaturan: auto-save profil, status PTKP (kawin/tanggungan/pekerjaan) utk estimasi PPh21, preview usia, hint API key AI PENTING: file ini HARUS dimuat sesuai urutan build.js (GROUP_A/GROUP_B) karena … |
 | 43 | `kategori.js` | 168 | Modal Kategori & Subkategori (tambah/edit/hapus, filter tampilan) PENTING: file ini HARUS dimuat sesuai urutan build.js (GROUP_A/GROUP_B) karena beberapa modul saling referensi. Urutan grup ini: data-default.js, … |
 | 44 | `kategorisasi-ai.js` | 186 | AI Auto-Kategorisasi Transaksi dari Catatan Bebas FITUR BARU: saat user mengetik Keterangan transaksi bebas di Input Transaksi (mis. "bayar galon+beras warung"), modul ini menebak Kategori & Subkategori yang paling … |
 | 45 | `tagihan-kalender.js` | 444 | Modul Tagihan/Bill (CRUD, riwayat, filter, arsip) & Kalender Jatuh Tempo PENTING: file ini HARUS dimuat sesuai urutan build.js (GROUP_A/GROUP_B) karena beberapa modul saling referensi. Urutan grup ini: data-default.js, … |
 | 46 | `backup-restore.js` | 719 | Export/import/backup data (satu domain penuh: CSV/JSON export laporan, backup terjadwal & manual per-modul, restore dari file backup, import dari Cashew/CSV lain, import Car Notes) (v89): blok "deteksi item checkout … |
-| 47 | `payroll-absensi.js` | 366 | Payroll: Absensi Harian & Kalkulator Gaji Mingguan (const Payroll={...}) (v93): dipindah dari backup-restore.js — domain ini sudah rapi sbg 1 objek modul (mirip LinkTx/Renov/Aset), jadi dipisah jadi file domain sendiri, … |
+| 47 | `payroll-absensi.js` | 413 | Payroll: Absensi Harian & Kalkulator Gaji Mingguan (const Payroll={...}) (v93): dipindah dari backup-restore.js — domain ini sudah rapi sbg 1 objek modul (mirip LinkTx/Renov/Aset), jadi dipisah jadi file domain sendiri, … |
 | 48 | `features-tukang-kendaraan-storage.js` | 1769 | Dana darurat, keuangan/laporan/grafik, budget, cobek grafik, cashflow forecast, target CATATAN: Sparepart (kategori & stok sparepart kendaraan) DIPINDAH ke sini dari features-etalase-piutang-renovai.js (sesi pemisahan … |
-| 49 | `features-aiwidget-reminder-gdrive-search.js` | 1587 | Reminder, hari kerja, kendaraan (pajak/SIM/servis/BBM/sparepart), storage & arsip, skema Google Sheets (SHEETS_SCHEMAS/SHEETS_MODULES) CATATAN: SHEETS_SCHEMAS dipindah dari features-edukasi-pajak-utang-sewakios.js (v57) … |
-| 50 | `features-sheets-pwa-selftest.js` | 2363 | Settings, notifikasi, PWA setup, self-test/smoke-test rendering, pajak/zakat/aset/utang PENTING: file ini HARUS dimuat sesuai urutan build.js (GROUP_A/GROUP_B) karena beberapa modul saling referensi. Urutan grup ini: … |
+| 49 | `features-aiwidget-reminder-gdrive-search.js` | 1612 | Reminder, hari kerja, kendaraan (pajak/SIM/servis/BBM/sparepart), storage & arsip, skema Google Sheets (SHEETS_SCHEMAS/SHEETS_MODULES) CATATAN: SHEETS_SCHEMAS dipindah dari features-edukasi-pajak-utang-sewakios.js (v57) … |
+| 50 | `features-sheets-pwa-selftest.js` | 2367 | Settings, notifikasi, PWA setup, self-test/smoke-test rendering, pajak/zakat/aset/utang PENTING: file ini HARUS dimuat sesuai urutan build.js (GROUP_A/GROUP_B) karena beberapa modul saling referensi. Urutan grup ini: … |
 
 ## 2. Index fungsi/variabel global → file (urut abjad)
 
@@ -321,6 +321,7 @@ bisa dipanggil sebagai "global" dari file manapun lewat bundel gabungan.
 | `delTx` | `tx-list-cashflow.js` |
 | `delVehicle` | `features-tukang-kendaraan-storage.js` |
 | `delWorkDay` | `payroll-absensi.js` |
+| `detectPaylaterDueNextMonth` | `scan-ocr.js` |
 | `dismissBackupReminder` | `modules-render.js` |
 | `downscaleImage` | `scan-ocr.js` |
 | `editAccIdx` | `akun.js` |
@@ -487,6 +488,7 @@ bisa dipanggil sebagai "global" dari file manapun lewat bundel gabungan.
 | `markCobekDelivered` | `cobek.js` |
 | `markSparepartServiced` | `features-tukang-kendaraan-storage.js` |
 | `matchingVehicleName` | `features-tukang-kendaraan-storage.js` |
+| `maybeOfferPaylaterReminder` | `scan-ocr.js` |
 | `migrateCobekCategory` | `features-helpers-global-security.js` |
 | `MODAL_HTML` | `modals.js` |
 | `MODAL_VERSION` | `modals.js` |
@@ -565,6 +567,7 @@ bisa dipanggil sebagai "global" dari file manapun lewat bundel gabungan.
 | `openWaShare` | `features-aiwidget-reminder-gdrive-search.js` |
 | `openWeeklyResetManual` | `reset-gaji-mingguan.js` |
 | `Order` | `cobek.js` |
+| `PAYLATER_DUE_NEXT_MONTH_RE` | `scan-ocr.js` |
 | `Payroll` | `payroll-absensi.js` |
 | `PBB` | `pajak-pbb-zakat.js` |
 | `Pelanggan` | `cobek.js` |
@@ -658,6 +661,7 @@ bisa dipanggil sebagai "global" dari file manapun lewat bundel gabungan.
 | `renderGDriveSettings` | `modules-render.js` |
 | `renderGrafik` | `modules-render.js` |
 | `renderKekayaanBersih` | `modules-render.js` |
+| `renderKeuAbsensiGajiCard` | `modules-render.js` |
 | `renderKeuangan` | `modules-render.js` |
 | `renderLapAccList` | `modules-render.js` |
 | `renderLaporan` | `modules-render.js` |
@@ -783,6 +787,7 @@ bisa dipanggil sebagai "global" dari file manapun lewat bundel gabungan.
 | `selectTanggungan` | `profil-pengaturan.js` |
 | `selectTxCat` | `transaksi.js` |
 | `selectTxSubCat` | `transaksi.js` |
+| `selectTxSubCatWithCat` | `transaksi.js` |
 | `selectVehicle` | `features-tukang-kendaraan-storage.js` |
 | `SelfCareReko` | `refleksi-selfcare.js` |
 | `sendChat` | `features-aiwidget-reminder-gdrive-search.js` |
