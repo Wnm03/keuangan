@@ -66,8 +66,8 @@ if(location.hostname==='localhost'||location.hostname==='127.0.0.1')return true;
 }catch(e){ /* anggap bukan dev mode kalau gagal deteksi */ }
 return false;
 }
-const APP_BUILD_VERSION = 'kw80-merge-advisor-card-dashcards-39';
-const PRODUCTION_BUILD_SYNCED_VERSION = 'kw80-merge-advisor-card-dashcards-39';
+const APP_BUILD_VERSION = 'kw80-merge-advisor-card-dashcards-36';
+const PRODUCTION_BUILD_SYNCED_VERSION = 'kw80-merge-advisor-card-dashcards-36';
 let D = {
 schemaVersion:SCHEMA_VERSION,
 transactions:[],cobek:[],products:[],produsen:[],cobekKategori:JSON.parse(JSON.stringify(DEFAULT_COBEK_KATEGORI)),targets:[],eduFunds:[],reminders:[],bills:[],billsArchive:[],
@@ -8373,7 +8373,7 @@ function aiErrorHint(provider,status){
 if(provider==='gemini')return(status===400||status===403)?' (cek API key di Pengaturan)':'';
 return status===401?' (API key salah/expired, cek di Pengaturan)':'';
 }
-// Advisor — pengatur tab utk card gabungan "🧭 Penasihat" (v124, kw80-merge-advisor-card-dashcards-39):
+// Advisor — pengatur tab utk card gabungan "🧭 Penasihat" (v124, kw80-merge-advisor-card-dashcards-36):
 // dulu FinCoach ("🩺 Insight Cepat", rule-based-gratis-instan) & AIWidget ("🔍 Laporan AI",
 // panggil Claude/Gemini, wajib API key) tampil sbg 2 card TERPISAH di Dashboard — sekarang
 // digabung jadi SATU card dgn 2 tab, supaya tidak terasa ada "2 penasihat AI" yang mirip2.

@@ -30,6 +30,15 @@
  *      index.html di akhir build — jadi dua file itu tidak akan
  *      pernah lagi diam-diam berbeda isi (dulu ini pure manual,
  *      gampang kelupaan salah satu).
+ *   7. Lint otomatis untuk regresi bug "chicken-egg" OCR: pengecekan
+ *      `if(typeof Tesseract==='undefined')` sbg guard dini SEBELUM
+ *      ocrRecognize()/getOcrWorker() sempat jalan. Tesseract baru
+ *      terdaftar sbg global DI DALAM ensureTesseract() (dipanggil dari
+ *      getOcrWorker()), jadi guard dini itu selalu true di scan
+ *      pertama & OCR tidak akan pernah bisa jalan sama sekali. Bug ini
+ *      pernah diperbaiki, lalu sempat ke-revert tanpa sengaja lewat
+ *      patch dari branch lama — build akan DIHENTIKAN kalau pola ini
+ *      muncul lagi. Lihat fungsi lintOcrPrematureTesseractCheck() di bawah.
  *
  * Pemakaian:
  *   node build.js                  → auto-increment nomor versi (…-31 → …-32)
@@ -88,6 +97,13 @@ const GROUP_B = [
   'filter-laporan.js',
   'akun.js',
   'gaji-calc.js',
+  'cicilan.js',
+  'tx-bbm.js',
+  'tx-stok-sparepart.js',
+  'tx-transfer.js',
+  'tx-cobek.js',
+  'tx-target.js',
+  'tx-list-cashflow.js',
   'transaksi.js',
   'profil-pengaturan.js',
   'kategori.js',
@@ -517,6 +533,29 @@ function lintUnescapedUserField() {
   return problems;
 }
 
+// 3b. Lint regresi bug "chicken-egg" OCR (lihat komentar di atas file & di
+// scan-ocr.js). Tesseract cuma didaftarkan sbg global DI DALAM
+// ensureTesseract(), yang HANYA dipanggil dari getOcrWorker()/ocrRecognize().
+// Guard dini `typeof Tesseract==='undefined'` SEBELUM ocrRecognize() sempat
+// jalan bikin OCR selalu gagal di percobaan pertama (deadlock). Satu-satunya
+// tempat pola string ini boleh muncul di source adalah di DALAM komentar
+// (mis. komentar BUGFIX yang menjelaskan sejarah bug ini) — bukan di kode aktif.
+function lintOcrPrematureTesseractCheck() {
+  const BAD_RE = /typeof\s+Tesseract\s*===?\s*['"]undefined['"]/;
+  const problems = [];
+  for (const f of ALL_SOURCE) {
+    const content = readFile(f);
+    const lines = content.split('\n');
+    lines.forEach((line, idx) => {
+      if (line.trim().startsWith('//')) return; // baris komentar, aman (mis. komentar BUGFIX historis)
+      if (BAD_RE.test(line)) {
+        problems.push(`${f}:${idx + 1} — ${line.trim()}`);
+      }
+    });
+  }
+  return problems;
+}
+
 // 4. Naikkan ?v=N & CACHE_NAME lewat bump-version.sh yang sudah ada
 function bumpCacheVersion() {
   const out = execSync('bash bump-version.sh', { cwd: ROOT }).toString();
@@ -564,7 +603,24 @@ function main() {
   }
   console.log('✓ Tidak ada field user yang dirender tanpa escapeHtml() (template literal maupun concatenation)\n');
 
-  const explicitVersion = process.argv[2];
+  console.log('Mengecek regresi pola bug "chicken-egg" OCR (typeof Tesseract===\'undefined\' sbg guard dini)...');
+  const ocrProblems = lintOcrPrematureTesseractCheck();
+  if (ocrProblems.length) {
+    console.error(`\n❌ BUILD DIHENTIKAN — ditemukan ${ocrProblems.length} baris dengan pola guard dini "typeof Tesseract==='undefined'":\n`);
+    ocrProblems.forEach((p) => console.error('  - ' + p));
+    console.error(
+      '\nPola ini pernah menyebabkan OCR selalu gagal di scan pertama (Tesseract baru terdaftar\n' +
+      'sbg global DI DALAM ensureTesseract(), yang dipanggil dari getOcrWorker()/ocrRecognize() —\n' +
+      'jadi guard dini ini selalu true & langsung return sebelum sempat jalan). Hapus baris di atas;\n' +
+      'biarkan ocrRecognize()/getOcrWorker() yang menangani kegagalan modul lewat scanErrorMessage().\n' +
+      'Lihat komentar BUGFIX di scan-ocr.js untuk detail lengkap.'
+    );
+    process.exit(1);
+  }
+  console.log('✓ Tidak ada regresi pola guard dini Tesseract\n');
+
+  // Ambil argumen non-flag pertama sbg explicit version (skip --flag spt --require-minify)
+  const explicitVersion = process.argv.slice(2).find((a) => !a.startsWith('--'));
   const oldVersion = detectCurrentVersion();
   const newVersion = computeNextVersion(oldVersion, explicitVersion);
 
@@ -581,6 +637,23 @@ function main() {
   console.log(`✓ app-bundle-b.min.js ditulis (${(resB.size / 1024).toFixed(1)} KB${resB.minified ? ', diminify pakai esbuild' : ' — TANPA minifikasi, esbuild tidak ditemukan'})`);
   if (resA.backupName || resB.backupName) {
     console.log(`✓ Backup bundle lama disimpan di backups/ (${[resA.backupName, resB.backupName].filter(Boolean).join(', ')})`);
+  }
+
+  // Guard: di CI/rilis produksi, esbuild WAJIB ada — `optionalDependencies` di
+  // npm bisa gagal terpasang secara DIAM-DIAM (mis. platform mismatch) tanpa
+  // bikin `npm install` exit non-zero, jadi CI bisa lolos & menghasilkan bundle
+  // TANPA minifikasi tanpa ada yang sadar. Aktifkan dgn flag --require-minify
+  // atau env REQUIRE_MINIFY=1 (dipakai oleh ci.yml). Build lokal tanpa flag ini
+  // tetap boleh fallback ke non-minified seperti biasa (aman utk dev sehari-hari).
+  const requireMinify = process.argv.includes('--require-minify') || process.env.REQUIRE_MINIFY === '1';
+  if (requireMinify && (!resA.minified || !resB.minified)) {
+    console.error(
+      '\n❌ BUILD DIHENTIKAN — --require-minify aktif tapi esbuild tidak terdeteksi/tidak jalan,\n' +
+      'jadi bundle di atas TIDAK diminify. Ini biasanya berarti `npm install` di environment ini\n' +
+      'gagal memasang esbuild (optionalDependencies) secara diam-diam. Cek log `npm install`,\n' +
+      'pastikan esbuild benar-benar terpasang, lalu jalankan ulang.'
+    );
+    process.exit(1);
   }
 
   console.log('');
@@ -606,6 +679,20 @@ function main() {
   }
 
   console.log(`\n✅ Build "${newVersion}" selesai & lolos cek sintaks. Siap di-upload (jangan lupa upload SEMUA file yang berubah, bukan cuma HTML).`);
+
+  // Regenerate FILE-MAP.md tiap build sukses supaya peta file & fungsi
+  // global selalu sinkron dengan source terbaru (lihat catatan di
+  // scripts/generate-file-map.js soal kenapa ini dibuat). Dibungkus
+  // try/catch: kalau generator ini gagal karena sebab apapun, jangan
+  // gagalkan build produksi cuma gara2 dokumentasi bantu gagal digenerate
+  // — cukup kasih warning.
+  try {
+    // eslint-disable-next-line global-require
+    const { main: generateFileMap } = require('./scripts/generate-file-map');
+    generateFileMap();
+  } catch (e) {
+    console.log(`\n⚠️  FILE-MAP.md gagal digenerate ulang (non-fatal, build tetap lanjut): ${e.message}`);
+  }
 
   if (!resA.minified) {
     console.log(
