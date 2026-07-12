@@ -125,6 +125,16 @@ details.card[open] summary::after{transform:rotate(180deg)}
 .tx-amount { font-family: 'Space Grotesk', sans-serif; font-size: 14px; font-weight: 700; white-space: nowrap; }
 .tx-del { background: none; border: none; color: var(--text3); cursor: pointer; padding: 4px; font-size: 14px; flex-shrink: 0; }
 
+/* === Bisnis Shop — ringkasan atas (fix: class dipakai di HTML tapi belum ada CSS-nya, kw190-shop-ui-fix) === */
+.shop-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--sp-3); margin-bottom: var(--sp-5); }
+.shop-stat { background: var(--surface2); border-radius: var(--r-lg); padding: var(--sp-6) var(--sp-3); text-align: center; border: 1px solid var(--border); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; min-height: 64px; }
+.shop-stat.clickable { cursor: pointer; transition: transform .15s ease, background .15s ease; }
+.shop-stat.clickable:active { transform: scale(0.96); background: var(--surface3); }
+.shop-val { font-family: 'Space Grotesk', sans-serif; font-size: var(--fs-stat); font-weight: 700; color: var(--text); line-height: 1.2; white-space: nowrap; }
+.shop-lbl { font-size: 10.5px; font-weight: 600; color: var(--text2); text-transform: uppercase; letter-spacing: .4px; }
+.shop-stat:nth-child(2) .shop-val { color: var(--accent4); }
+.shop-stat:nth-child(3) .shop-val { color: var(--accent3); }
+
 /* === Etalase Produk — kartu profesional (kw86-etalase-redesign) === */
 .shop-product-grid { display: flex; flex-direction: column; gap: 10px; }
 .shop-product-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-xl); padding: 13px 14px 13px 17px; position: relative; overflow: hidden; }
@@ -585,13 +595,67 @@ textarea.fi { resize: vertical; min-height: 80px; }
 .trs-part-check{width:20px;height:20px;border-radius:6px;border:2px solid var(--border2);flex-shrink:0;margin-top:1px;display:none;align-items:center;justify-content:center;font-size:12px;color:#fff;cursor:pointer;}
 .trs-part-check.show{display:flex;}
 .trs-part-check.checked{background:var(--accent3);border-color:var(--accent3);}
-/* Kasir AI (v127, kw81-kasir-ai-pos) — grid produk tap-to-add di tab baru "🧠 Kasir AI" */
-.kasir-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:4px;}
-.kasir-tile{position:relative;background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:10px 12px;cursor:pointer;user-select:none;transition:transform .1s;}
-.kasir-tile:active{transform:scale(0.97);}
-.kasir-tile-active{border-color:var(--accent);background:var(--accent-soft);}
-.kasir-tile-disabled{opacity:.45;cursor:not-allowed;}
-.kasir-tile-name{font-size:12.5px;font-weight:700;line-height:1.3;margin-bottom:4px;}
-.kasir-tile-price{font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:800;color:var(--accent);}
-.kasir-tile-stock{font-size:10.5px;color:var(--text2);margin-top:2px;}
-.kasir-tile-badge{position:absolute;top:-6px;right:-6px;background:var(--accent);color:#fff;border-radius:50%;min-width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;padding:0 4px;}
+/* Kasir AI (v127, kw81-kasir-ai-pos) — grid produk tap-to-add di tab baru "🧠 Kasir AI".
+   Redesign tampilan profesional di v196 (kw196-kasir-pro-redesign): toolbar sticky, tile
+   dgn aksen level-stok (selaras bahasa desain .shop-product-card di Etalase), kartu keranjang
+   terangkat + rincian struk (subtotal/diskon/ongkir), qty stepper pill, & floating summary
+   bar di bawah supaya total keranjang selalu kelihatan sambil scroll pilih produk. */
+.kasir-wrap{position:relative;padding-bottom:8px;}
+.kasir-toolbar{margin-bottom:10px;}
+.kasir-toolbar .search-wrap{margin-bottom:8px;}
+
+.kasir-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:9px;margin-bottom:4px;}
+.kasir-tile{position:relative;background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--accent3);border-radius:var(--r-lg);padding:11px 12px 10px;cursor:pointer;user-select:none;box-shadow:0 1px 3px rgba(0,0,0,.06);transition:transform .12s ease,box-shadow .12s ease,border-color .12s ease;}
+.kasir-tile:active{transform:scale(0.97);box-shadow:0 1px 2px rgba(0,0,0,.05);}
+.kasir-tile.stock-low{border-left-color:var(--accent4);}
+.kasir-tile.stock-out{border-left-color:var(--accent2);}
+.kasir-tile-active{border-color:var(--accent);border-left-color:var(--accent);background:var(--accent-soft);box-shadow:0 0 0 1px var(--accent);}
+.kasir-tile-disabled{opacity:.4;cursor:not-allowed;box-shadow:none;}
+.kasir-tile-name{font-size:12.5px;font-weight:700;line-height:1.3;margin-bottom:5px;min-height:2.6em;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+.kasir-tile-price{font-family:'Space Grotesk',sans-serif;font-size:14.5px;font-weight:800;color:var(--text);}
+.kasir-tile-stock{font-size:10px;color:var(--text2);margin-top:3px;font-weight:600;text-transform:uppercase;letter-spacing:.3px;}
+.kasir-tile.stock-low .kasir-tile-stock{color:var(--accent4);}
+.kasir-tile.stock-out .kasir-tile-stock{color:var(--accent2);}
+.kasir-tile-badge{position:absolute;top:-7px;right:-7px;background:var(--accent);color:#fff;border-radius:50%;min-width:21px;height:21px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;padding:0 4px;box-shadow:0 2px 5px rgba(0,0,0,.25);}
+.kasir-tile-pricewarn{position:absolute;top:-7px;left:-7px;background:var(--surface);border:1px solid var(--border2);border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:12px;line-height:1;cursor:pointer;box-shadow:0 2px 4px rgba(0,0,0,.25);padding:0;}
+/* kw198-kasir-viewtoggle: toggle grid/list + varian tile ringkas 1 baris utk mode list */
+.kasir-view-toggle .chip-btn{padding:6px 11px;font-size:13px;line-height:1;}
+.kasir-grid.kasir-grid-list{display:flex;flex-direction:column;gap:6px;}
+.kasir-tile-row{display:flex;align-items:center;gap:10px;padding:9px 12px;}
+.kasir-tile-row .kasir-tile-row-main{flex:1;min-width:0;}
+.kasir-tile-row .kasir-tile-name{font-size:12.5px;font-weight:700;margin-bottom:2px;min-height:0;-webkit-line-clamp:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.kasir-tile-row .kasir-tile-stock{margin-top:0;}
+.kasir-tile-row .kasir-tile-price{white-space:nowrap;flex-shrink:0;}
+.kasir-tile-pricewarn-inline{position:static;flex-shrink:0;width:auto;height:auto;background:transparent;border:none;box-shadow:none;padding:0 1px;}
+.kasir-tile-badge-inline{position:static;flex-shrink:0;box-shadow:none;margin-left:1px;}
+/* kw199-kasir-kategori-chip: baris filter kategori (scroll horizontal) di atas grid produk */
+.kasir-kat-chips{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;margin-bottom:10px;-webkit-overflow-scrolling:touch;scrollbar-width:none;}
+.kasir-kat-chips::-webkit-scrollbar{display:none;}
+.kasir-kat-chips .chip-btn{flex-shrink:0;}
+
+/* Kartu keranjang & checkout — diangkat jadi 1 panel jelas, terpisah dari grid produk */
+.kasir-cart-card{background:var(--surface2);border:1px solid var(--border);border-radius:16px;padding:16px;scroll-margin-top:12px;}
+.kasir-cart-item{padding:11px 0;}
+.kasir-cart-fields{border-top:1px dashed var(--border);margin-top:2px;padding-top:12px;}
+.kasir-qty-pill{display:flex;align-items:center;gap:0;background:var(--surface3);border-radius:var(--r-pill);flex-shrink:0;overflow:hidden;}
+.kasir-qty-pill button{width:28px;height:28px;border:none;background:none;color:var(--accent);font-size:15px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+.kasir-qty-pill button:active{background:var(--accent-soft);}
+.kasir-qty-pill span{min-width:20px;text-align:center;font-size:13px;font-weight:800;}
+
+/* Rincian struk (subtotal/diskon/ongkir/total) — gaya nota, konsisten dgn .shop-product-prices */
+.kasir-receipt{background:var(--surface);border:1px solid var(--border2);border-radius:14px;padding:14px 16px;margin:14px 0;}
+.kasir-receipt-row{display:flex;justify-content:space-between;font-size:12.5px;color:var(--text2);padding:3px 0;}
+.kasir-receipt-row span:last-child{font-weight:700;color:var(--text);}
+.kasir-receipt-total{display:flex;justify-content:space-between;align-items:baseline;margin-top:8px;padding-top:10px;border-top:1px dashed var(--border);}
+.kasir-receipt-total span:first-child{font-size:12px;color:var(--text2);font-weight:600;text-transform:uppercase;letter-spacing:.5px;}
+.kasir-receipt-total span:last-child{font-family:'Space Grotesk',sans-serif;font-size:24px;font-weight:800;color:var(--accent3);}
+.kasir-receipt-profit{font-size:11.5px;color:var(--text2);margin-top:4px;}
+
+/* Floating summary bar — total keranjang tetap kelihatan saat scroll pilih produk, tap = lompat ke checkout */
+.kasir-floatbar{position:fixed;left:14px;right:14px;bottom:0;transform:translateY(120%);opacity:0;pointer-events:none;z-index:90;display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--accent);color:#fff;border-radius:16px;padding:13px 18px;box-shadow:0 8px 24px rgba(0,0,0,.28);cursor:pointer;transition:transform .22s ease,opacity .22s ease;margin-bottom:calc(70px + env(safe-area-inset-bottom,0px));}
+.kasir-floatbar.kasir-floatbar-show{transform:translateY(0);opacity:1;pointer-events:auto;}
+.kasir-floatbar:active{transform:scale(0.98);}
+.kasir-floatbar-info{display:flex;flex-direction:column;gap:1px;}
+.kasir-floatbar-count{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;opacity:.85;}
+.kasir-floatbar-total{font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:800;}
+.kasir-floatbar-cta{font-size:13px;font-weight:800;white-space:nowrap;}
