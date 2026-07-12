@@ -19,12 +19,15 @@ const Kasir={
 cart:[], // {productId, qty, hargaOverride}
 search:'',
 priceType:'jual',
+viewMode:'grid', // 'grid' (tile 2 kolom) atau 'list' (baris ringkas) — kw198-kasir-viewtoggle, dipilih user & diingat lewat localStorage
+categoryFilter:'', // '' = semua kategori — kw199-kasir-kategori-chip, id dari D.cobekKategori
 populateAccSelect(){
 const el=document.getElementById('kasirAcc');
 if(el)el.innerHTML=D.accounts.map(a=>`<option value="${a.id}">${a.emoji} ${escapeHtml(a.name)}</option>`).join('');
 },
 render(){
 Kasir.populateAccSelect();
+Kasir.renderCategoryChips();
 Kasir.renderGrid();
 Kasir.renderCart();
 },
@@ -32,6 +35,7 @@ reset(){
 Kasir.cart=[];
 Kasir.search='';
 Kasir.priceType='jual';
+Kasir.categoryFilter='';
 const s=document.getElementById('kasirSearch');if(s)s.value='';
 const d=document.getElementById('kasirDiskon');if(d)d.value='';
 const o=document.getElementById('kasirOngkir');if(o)o.value='';
@@ -54,29 +58,112 @@ Kasir.renderGrid();
 Kasir.renderCart();
 },
 filteredProducts(){
-if(!Kasir.search)return D.products;
-return D.products.filter(p=>p.name.toLowerCase().includes(Kasir.search));
+let list=D.products;
+if(Kasir.categoryFilter)list=list.filter(p=>p.kategoriId===Kasir.categoryFilter);
+if(Kasir.search)list=list.filter(p=>p.name.toLowerCase().includes(Kasir.search));
+return list;
+},
+// Kategori chip (kw199-kasir-kategori-chip): daftar kategori yg BENERAN dipakai minimal 1 produk
+// (bukan seluruh D.cobekKategori) — kategori kosong/tak terpakai tidak perlu bikin baris chip
+// makin panjang & tidak berguna dipilih (hasilnya pasti "Produk tidak ditemukan").
+availableCategories(){
+const seen=new Map();
+const kats=D.cobekKategori||[];
+D.products.forEach(p=>{
+if(!p.kategoriId)return;
+const kat=kats.find(k=>k.id===p.kategoriId);
+if(!kat)return;
+const cur=seen.get(kat.id);
+if(cur)cur.count++;
+else seen.set(kat.id,{id:kat.id,name:kat.name,count:1});
+});
+return[...seen.values()].sort((a,b)=>a.name.localeCompare(b.name,'id'));
+},
+setCategoryFilter(katId){
+Kasir.categoryFilter=katId||'';
+Kasir.renderCategoryChips();
+Kasir.renderGrid();
+},
+renderCategoryChips(){
+const wrap=document.getElementById('kasirKategoriChips');
+if(!wrap)return;
+const cats=Kasir.availableCategories();
+// Kalau produk belum dikelompokkan kategori sama sekali, sembunyikan baris chip — jangan
+// nambah elemen kosong di layar checkout yang memang didesain cepat/ringkas.
+if(!cats.length){
+wrap.style.display='none';
+wrap.innerHTML='';
+return;
+}
+wrap.style.display='flex';
+wrap.innerHTML=`<button type="button" class="chip-btn kasir-kat-chip${Kasir.categoryFilter?'':' active'}" data-action="Kasir.setCategoryFilter" data-args='[""]'>Semua (${D.products.length})</button>`
++cats.map(c=>`<button type="button" class="chip-btn kasir-kat-chip${Kasir.categoryFilter===c.id?' active':''}" data-action="Kasir.setCategoryFilter" data-args='["${c.id}"]'>${escapeHtml(c.name)} (${c.count})</button>`).join('');
+},
+// setViewMode (kw198-kasir-viewtoggle): grid 2 kolom bagus utk sedikit produk (lebih visual),
+// list 1 kolom ringkas (nama+harga+stok 1 baris) mempercepat cari kalau produk banyak. Pilihan
+// diingat lewat localStorage (bukan D.profile) krn ini murni preferensi tampilan per-device,
+// bukan data yang perlu ikut backup/sync — sama pola dgn kw_dashServisVehFilter.
+setViewMode(mode,el){
+if(mode!=='grid'&&mode!=='list')return;
+Kasir.viewMode=mode;
+try{localStorage.setItem('kw_kasirViewMode',mode);}catch(e){/* abaikan, cuma preferensi tampilan */}
+document.querySelectorAll('#kasirViewToggle .chip-btn').forEach(b=>b.classList.remove('active'));
+if(el)el.classList.add('active');
+Kasir.renderGrid();
 },
 renderGrid(){
 const el=document.getElementById('kasirGrid');
 if(!el)return;
+el.classList.toggle('kasir-grid-list',Kasir.viewMode==='list');
+document.querySelectorAll('#kasirViewToggle .chip-btn').forEach(b=>b.classList.toggle('active',b.dataset.view===Kasir.viewMode));
 if(!D.products.length){
 el.innerHTML='<div class="empty"><div class="empty-icon">📦</div><div class="empty-text">Belum ada produk — tambah dulu di tab 📦 Etalase</div></div>';
 return;
 }
 const list=Kasir.filteredProducts();
+const isList=Kasir.viewMode==='list';
 el.innerHTML=list.length?list.map(p=>{
 const inCart=Kasir.cart.find(i=>i.productId===p.id);
 const habis=(p.stock||0)<=0;
 let harga=(Kasir.priceType==='reseller'&&p.hargaReseller)?p.hargaReseller:p.hargaJual;
 if(p.diskonPersen)harga=harga-(harga*p.diskonPersen/100);
-return`<div class="kasir-tile${habis?' kasir-tile-disabled':''}${inCart?' kasir-tile-active':''}"${habis?'':` data-action="Kasir.addToCart" data-args='["${p.id}"]'`}>
+// Reko harga (kw194-kasir-order-pricereko): tandai tile produk yg Harga Jual-nya menyimpang
+// jauh dari estimasi PriceRekoWidget (rumus SAMA dgn widget "🤖 Rekomendasi Harga Jual AI" di
+// Etalase) — biar kasir sadar dari layar checkout juga, tanpa harus bolak-balik ke Etalase.
+// Tombol terpisah (bukan nempel ke tile) supaya tap badge ini TIDAK ikut nge-trigger addToCart
+// (click delegation ambil elemen [data-action] TERDEKAT ke target, lihat features-helpers-
+// global-security.js).
+const priceChk=(typeof PriceRekoWidget!=='undefined')?PriceRekoWidget.checkOne(p):null;
+const warnCls=isList?'kasir-tile-pricewarn kasir-tile-pricewarn-inline':'kasir-tile-pricewarn';
+const priceWarn=priceChk?`<button type="button" class="${warnCls}" data-action="Kasir.openPriceReko" data-args='${escapeHtml(JSON.stringify([p.id]))}' title="${priceChk.diffPct<0?'Harga di bawah':'Harga di atas'} estimasi Etalase (reko ${fmtFull(priceChk.reko)}) — tap utk detail" aria-label="Peringatan harga">${priceChk.diffPct<0?'⬇️':'⬆️'}</button>`:'';
+const stockLvl=habis?'stock-out':((p.stock||0)<=3?'stock-low':'stock-ok');
+const rowAttrs=`${habis?'':` data-action="Kasir.addToCart" data-args='["${p.id}"]'`}`;
+if(isList){
+const badge=inCart?`<div class="kasir-tile-badge kasir-tile-badge-inline">${inCart.qty}</div>`:'';
+return`<div class="kasir-tile kasir-tile-row ${stockLvl}${habis?' kasir-tile-disabled':''}${inCart?' kasir-tile-active':''}"${rowAttrs}>
+      ${priceWarn}
+      <div class="kasir-tile-row-main">
+        <div class="kasir-tile-name">${escapeHtml(p.name)}</div>
+        <div class="kasir-tile-stock">${habis?'Stok habis':'Stok '+p.stock}</div>
+      </div>
+      <div class="kasir-tile-price">${fmt(harga)}</div>
+      ${badge}
+    </div>`;
+}
+return`<div class="kasir-tile ${stockLvl}${habis?' kasir-tile-disabled':''}${inCart?' kasir-tile-active':''}"${rowAttrs}>
+      ${priceWarn}
       <div class="kasir-tile-name">${escapeHtml(p.name)}</div>
       <div class="kasir-tile-price">${fmt(harga)}</div>
       <div class="kasir-tile-stock">${habis?'Stok habis':'Stok '+p.stock}</div>
       ${inCart?`<div class="kasir-tile-badge">${inCart.qty}</div>`:''}
     </div>`;
 }).join(''):'<div class="empty"><div class="empty-text">Produk tidak ditemukan</div></div>';
+},
+// openPriceReko(pid) — dipanggil dari badge ⬇️/⬆️ di tile grid. Reuse PriceRekoWidget.openDetail
+// yg sudah ada (buka productModal produk itu & auto-expand panel "Rekomendasi Harga Jual"),
+// biar 1 alur "lihat & perbaiki harga" konsisten dipakai dari Etalase MAUPUN dari Kasir.
+openPriceReko(pid){
+if(typeof PriceRekoWidget!=='undefined')PriceRekoWidget.openDetail(pid);
 },
 addToCart(pid){
 const p=D.products.find(x=>x.id===pid);
@@ -123,27 +210,47 @@ const profit=subtotal-modal-diskon;
 return{lines,subtotal,modal,diskon,ongkir,total,profit};
 },
 renderCart(){
-const{lines,total,profit}=Kasir.computeTotals();
+const{lines,subtotal,diskon,ongkir,total,profit}=Kasir.computeTotals();
 const el=document.getElementById('kasirCartList');
 if(el){
-el.innerHTML=lines.length?lines.map((l,i)=>`
-      <div class="tx-item">
+el.innerHTML=lines.length?lines.map((l,i)=>{
+const priceChk=(typeof PriceRekoWidget!=='undefined')?PriceRekoWidget.checkOne(l.product):null;
+const priceHint=priceChk?`<div class="u-mt2" style="font-size:10.5px;color:${priceChk.diffPct<0?'var(--accent2)':'var(--accent4)'};font-weight:600">${priceChk.diffPct<0?'⬇️':'⬆️'} Reko Etalase: ${fmt(priceChk.reko)}</div>`:'';
+return`
+      <div class="tx-item kasir-cart-item">
         <div class="tx-icon u-bgaccsoft">🛒</div>
         <div class="tx-info">
           <div class="tx-name">${escapeHtml(l.product.name)}</div>
-          <div class="tx-meta">${fmt(l.harga)} × ${l.qty} = ${fmt(l.lineTotal)}</div>
+          <div class="tx-meta">${fmt(l.harga)} × ${l.qty} = <b class="u-ctext">${fmt(l.lineTotal)}</b></div>
+          ${priceHint}
         </div>
-        <div class="u-flex u-aic u-gap6">
-          <button class="btn btn-ghost btn-sm" style="padding:4px 10px" data-action="Kasir.changeQty" data-args="${escapeHtml(JSON.stringify([i,-1]))}" aria-label="Kurangi jumlah">−</button>
-          <span class="u-fw700">${l.qty}</span>
-          <button class="btn btn-ghost btn-sm" style="padding:4px 10px" data-action="Kasir.changeQty" data-args="${escapeHtml(JSON.stringify([i,1]))}" aria-label="Tambah jumlah">+</button>
+        <div class="kasir-qty-pill">
+          <button data-action="Kasir.changeQty" data-args="${escapeHtml(JSON.stringify([i,-1]))}" aria-label="Kurangi jumlah">−</button>
+          <span>${l.qty}</span>
+          <button data-action="Kasir.changeQty" data-args="${escapeHtml(JSON.stringify([i,1]))}" aria-label="Tambah jumlah">+</button>
         </div>
         <button class="tx-del" data-action="Kasir.removeItem" data-args="${escapeHtml(JSON.stringify([i]))}" aria-label="Hapus">🗑</button>
-      </div>`).join(''):'<div class="empty"><div class="empty-text">Keranjang kosong — tap produk di atas ⤴️</div></div>';
+      </div>`;
+}).join(''):'<div class="empty"><div class="empty-icon">🛒</div><div class="empty-text">Keranjang kosong — tap produk di atas ⤴️</div></div>';
 }
+const subEl=document.getElementById('kasirSubDisplay');if(subEl)subEl.textContent=fmtFull(subtotal);
+const diskonRow=document.getElementById('kasirDiskonRow');
+if(diskonRow){diskonRow.style.display=diskon>0?'flex':'none';const dEl=document.getElementById('kasirDiskonDisplay');if(dEl)dEl.textContent='− '+fmtFull(diskon);}
+const ongkirRow=document.getElementById('kasirOngkirRow');
+if(ongkirRow){ongkirRow.style.display=ongkir>0?'flex':'none';const oEl=document.getElementById('kasirOngkirDisplay');if(oEl)oEl.textContent='+ '+fmtFull(ongkir);}
 const totalEl=document.getElementById('kasirTotalDisplay');if(totalEl)totalEl.textContent=fmtFull(total);
 const profitEl=document.getElementById('kasirProfitDisplay');if(profitEl)profitEl.textContent='Estimasi untung: '+fmtFull(profit);
 const btn=document.getElementById('kasirCheckoutBtn');if(btn)btn.disabled=lines.length===0;
+const floatbar=document.getElementById('kasirFloatbar');
+if(floatbar){
+floatbar.classList.toggle('kasir-floatbar-show',lines.length>0);
+const cEl=document.getElementById('kasirFloatCount');if(cEl)cEl.textContent=lines.reduce((s,l)=>s+l.qty,0)+' item';
+const tEl=document.getElementById('kasirFloatTotal');if(tEl)tEl.textContent=fmtFull(total);
+}
+},
+scrollToCheckout(){
+const sec=document.getElementById('kasirCheckoutSection');
+if(sec)sec.scrollIntoView({behavior:'smooth',block:'start'});
 },
 async aiSuggest(){
 if(!D.profile.apiKey){
@@ -219,3 +326,5 @@ toast('✅ Transaksi tersimpan & tersinkron ke Keuangan');
 Kasir.reset();
 }
 };
+// Muat preferensi mode tampilan (grid/list) yg tersimpan dari sesi sebelumnya — kw198-kasir-viewtoggle.
+(function(){try{const saved=localStorage.getItem('kw_kasirViewMode');if(saved==='list')Kasir.viewMode='list';}catch(e){/* default 'grid' */}})();

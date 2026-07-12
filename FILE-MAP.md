@@ -11,8 +11,8 @@
 > file tapi lupa `node build.js`), jalankan ulang generatornya, JANGAN diedit
 > tangan — editan manual bakal ketimpa lagi di build berikutnya.
 
-Terakhir digenerate: 2026-07-11T13:48:45.380Z
-Total file source: 50 · Total identifier global: 858
+Terakhir digenerate: 2026-07-12T01:37:15.901Z
+Total file source: 50 · Total identifier global: 865
 
 ## 1. Urutan load & ringkasan tiap file
 
@@ -24,8 +24,8 @@ bundler menggabungkan semua file jadi `app-bundle-a.min.js`/`app-bundle-b.min.js
 | 1 | `modules-render.js` | 1400 | Fungsi render (85 fungsi) dipisah dari app_production.html untuk pemerataan ukuran file. Semua fungsi ini murni definisi function global (bukan module), jadi tetap bisa dipanggil dari file manapun yang loadnya … |
 | 2 | `modals.js` | 7 | Modal HTML dipisah dari app_production.html untuk pemerataan ukuran file. Setiap elemen array persis sama dengan blok <div class="overlay" id="...">...</div> aslinya, di-inject balik ke posisi yang sama persis via … |
 | 3 | `modules-calc.js` | 856 | _(tidak ada komentar header)_ |
-| 4 | `cobek.js` | 1295 | Domain Shop: etalase/stok produk, produsen, order pelanggan, laporan omzet, data pelanggan, widget dashboard "🤖 Rekomendasi Harga Jual AI" (PriceRekoWidget, kw73) & "📦 Rekomendasi Restock AI" (StockRekoWidget, kw74) — … |
-| 5 | `kasir.js` | 222 | Modul "🧠 Kasir AI" (v127, kw81-kasir-ai-pos): Tab checkout BARU utk halaman Bisnis Shop yang lebih cepat dari form "Transaksi Manual" (Order) lama: tap produk langsung dari grid (bukan pilih dari dropdown lalu klik "+ … |
+| 4 | `cobek.js` | 1575 | Domain Shop: etalase/stok produk, produsen, order pelanggan, laporan omzet, data pelanggan, widget dashboard "🤖 Rekomendasi Harga Jual AI" (PriceRekoWidget, kw73) & "📦 Rekomendasi Restock AI" (StockRekoWidget, kw74) — … |
+| 5 | `kasir.js` | 331 | Modul "🧠 Kasir AI" (v127, kw81-kasir-ai-pos): Tab checkout BARU utk halaman Bisnis Shop yang lebih cepat dari form "Transaksi Manual" (Order) lama: tap produk langsung dari grid (bukan pilih dari dropdown lalu klik "+ … |
 | 6 | `piutang-utang.js` | 352 | Domain Piutang & Utang: catatan piutang (uang dipinjamkan), utang (uang dipinjam) beserta status lunas/cicilan, dan DebtStrategy (simulasi strategi pelunasan Avalanche/Snowball). Juga berisi Bill (helper hubungkan … |
 | 7 | `pajak-pbb-zakat.js` | 343 | Kalkulator Pajak Bumi & Bangunan (PBB), Zakat (penghasilan, maal, fitrah), Referensi AI (cek harga emas/nisab via AI), Pajak UMKM, dan PPh 21 (Orang Pribadi) Dipisah dari: features-renovasi-pajak-aset-order.js (PBB, … |
 | 8 | `features-budget-laporan-carnotes-pelanggan.js` | 1494 | Budget & laporan keuangan, Car Notes (BBM/servis/torsi baut), aksi AI chat, data pelanggan PENTING: file ini HARUS dimuat sesuai urutan build.js (GROUP_A/GROUP_B) karena beberapa modul saling referensi. Urutan grup ini: … |
@@ -68,7 +68,7 @@ bundler menggabungkan semua file jadi `app-bundle-a.min.js`/`app-bundle-b.min.js
 | 45 | `tagihan-kalender.js` | 444 | Modul Tagihan/Bill (CRUD, riwayat, filter, arsip) & Kalender Jatuh Tempo PENTING: file ini HARUS dimuat sesuai urutan build.js (GROUP_A/GROUP_B) karena beberapa modul saling referensi. Urutan grup ini: data-default.js, … |
 | 46 | `backup-restore.js` | 719 | Export/import/backup data (satu domain penuh: CSV/JSON export laporan, backup terjadwal & manual per-modul, restore dari file backup, import dari Cashew/CSV lain, import Car Notes) (v89): blok "deteksi item checkout … |
 | 47 | `payroll-absensi.js` | 449 | Payroll: Absensi Harian & Kalkulator Gaji Mingguan (const Payroll={...}) (v93): dipindah dari backup-restore.js — domain ini sudah rapi sbg 1 objek modul (mirip LinkTx/Renov/Aset), jadi dipisah jadi file domain sendiri, … |
-| 48 | `features-tukang-kendaraan-storage.js` | 1769 | Dana darurat, keuangan/laporan/grafik, budget, shop grafik, cashflow forecast, target CATATAN: Sparepart (kategori & stok sparepart kendaraan) DIPINDAH ke sini dari features-etalase-piutang-renovai.js (sesi pemisahan … |
+| 48 | `features-tukang-kendaraan-storage.js` | 1795 | Dana darurat, keuangan/laporan/grafik, budget, shop grafik, cashflow forecast, target CATATAN: Sparepart (kategori & stok sparepart kendaraan) DIPINDAH ke sini dari features-etalase-piutang-renovai.js (sesi pemisahan … |
 | 49 | `features-aiwidget-reminder-gdrive-search.js` | 1612 | Reminder, hari kerja, kendaraan (pajak/SIM/servis/BBM/sparepart), storage & arsip, skema Google Sheets (SHEETS_SCHEMAS/SHEETS_MODULES) CATATAN: SHEETS_SCHEMAS dipindah dari features-edukasi-pajak-utang-sewakios.js (v57) … |
 | 50 | `features-sheets-pwa-selftest.js` | 2367 | Settings, notifikasi, PWA setup, self-test/smoke-test rendering, pajak/zakat/aset/utang PENTING: file ini HARUS dimuat sesuai urutan build.js (GROUP_A/GROUP_B) karena beberapa modul saling referensi. Urutan grup ini: … |
 
@@ -255,6 +255,7 @@ bisa dipanggil sebagai "global" dari file manapun lewat bundel gabungan.
 | `closeQS` | `modal-navigasi.js` |
 | `codeFromName` | `features-tukang-kendaraan-storage.js` |
 | `commitCurKmEdit` | `features-tukang-kendaraan-storage.js` |
+| `commitImportKatalog` | `cobek.js` |
 | `computeCashflowForecast` | `tx-list-cashflow.js` |
 | `computeFileSizeStatus` | `diagnostik-versi.js` |
 | `computeModalSweepFnNames` | `features-sheets-pwa-selftest.js` |
@@ -336,6 +337,7 @@ bisa dipanggil sebagai "global" dari file manapun lewat bundel gabungan.
 | `encryptApiKeyWithPin` | `keamanan-pin.js` |
 | `escapeHtml` | `helper-teks.js` |
 | `estimateKmPerDay` | `features-tukang-kendaraan-storage.js` |
+| `estimateRpPerKm` | `features-tukang-kendaraan-storage.js` |
 | `estimateServiceDateISO` | `features-tukang-kendaraan-storage.js` |
 | `Etalase` | `cobek.js` |
 | `evalAmtExpr` | `kalkulator-input.js` |
@@ -457,6 +459,7 @@ bisa dipanggil sebagai "global" dari file manapun lewat bundel gabungan.
 | `ikatSimTagihan` | `features-tukang-kendaraan-storage.js` |
 | `ikatSptTagihan` | `features-tukang-kendaraan-storage.js` |
 | `ikatVehTaxTagihan` | `features-tukang-kendaraan-storage.js` |
+| `ImportKatalog` | `cobek.js` |
 | `initChat` | `features-aiwidget-reminder-gdrive-search.js` |
 | `inRange` | `backup-restore.js` |
 | `isAccLinkedToAsset` | `akun.js` |
@@ -506,6 +509,7 @@ bisa dipanggil sebagai "global" dari file manapun lewat bundel gabungan.
 | `onCustomerInputChange` | `cobek.js` |
 | `onFiCatTotalToggle` | `modules-calc.js` |
 | `onFKatChange` | `filter-laporan.js` |
+| `OngkirCalc` | `cobek.js` |
 | `onGlobalSearchInput` | `features-aiwidget-reminder-gdrive-search.js` |
 | `onKfKatChange` | `filter-laporan.js` |
 | `onKfSearchInput` | `filter-laporan.js` |
@@ -542,6 +546,7 @@ bisa dipanggil sebagai "global" dari file manapun lewat bundel gabungan.
 | `openFiSettingsModal` | `modules-calc.js` |
 | `openGajiCalc` | `gaji-calc.js` |
 | `openGlobalSearch` | `features-aiwidget-reminder-gdrive-search.js` |
+| `openImportKatalogModal` | `cobek.js` |
 | `openKmModal` | `features-tukang-kendaraan-storage.js` |
 | `openModal` | `modal-navigasi.js` |
 | `openOrderModal` | `cobek.js` |
@@ -595,6 +600,7 @@ bisa dipanggil sebagai "global" dari file manapun lewat bundel gabungan.
 | `populateTxShopStockSelect` | `cobek.js` |
 | `populateTxStockSelect` | `tx-stok-sparepart.js` |
 | `PORTFOLIO_LABELS` | `aset.js` |
+| `previewImportKatalog` | `cobek.js` |
 | `PriceReko` | `cobek.js` |
 | `PriceRekoWidget` | `cobek.js` |
 | `PRODUCTION_BUILD_SYNCED_VERSION` | `features-helpers-global-security.js` |
@@ -798,6 +804,7 @@ bisa dipanggil sebagai "global" dari file manapun lewat bundel gabungan.
 | `setCnTab` | `features-tukang-kendaraan-storage.js` |
 | `setCobekTab` | `cobek.js` |
 | `setDashServisVehFilter` | `features-tukang-kendaraan-storage.js` |
+| `setImportKatalogTarget` | `cobek.js` |
 | `setKeuanganTab` | `tx-list-cashflow.js` |
 | `setPayMethod` | `transaksi.js` |
 | `setPeriode` | `tx-list-cashflow.js` |

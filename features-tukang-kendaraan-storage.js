@@ -1007,6 +1007,32 @@ if(!kmPerDay||kmPerDay<=0||sisaKm===null||sisaKm===undefined||sisaKm<=0)return n
 const d=new Date();d.setHours(0,0,0,0);d.setDate(d.getDate()+Math.ceil(sisaKm/kmPerDay));
 return dateToISO(d);
 }
+// estimateRpPerKm — dipakai OngkirCalc.autoFillBiaya() (cobek.js, kw191-ongkir-jarak) utk isi
+// otomatis field "Ongkos/km" dari histori BBM kendaraan (lebih akurat drpd cuma harga/liter, karena
+// ikut memperhitungkan konsumsi BBM motor/mobil itu sendiri, bukan cuma harga bensin).
+// Formula: ambil SEMUA log "Isi Full Tank" kendaraan ini (diurutkan by km) -- jarak antara 2 titik
+// full tank berturut-turut ditempuh dgn BAHAN BAKAR SEBANYAK liter di titik KEDUA (convention standar
+// hitung konsumsi BBM: isi penuh -> jalan -> isi penuh lagi, liter pengisian ke-2 = liter yg abis
+// dipakai sepanjang jarak itu). Totalkan semua km & liter dari seluruh pasangan berurutan, baru itung
+// km/liter gabungannya (lebih stabil drpd rata-rata dari tiap pasangan kecil). Ongkos/km = rata-rata
+// harga/liter (10 log BBM terakhir) ÷ km/liter itu. Butuh minimal 2 log "Isi Full Tank" dgn km naik
+// utk kendaraan ini -- kalau kurang, balikin null.
+function estimateRpPerKm(vehicleId){
+const logs=(D.bbmLogs||[]).filter(b=>b.vehicleId===vehicleId&&b.fullTank&&isFinite(b.km)&&b.km>0&&b.liter>0).sort((a,b)=>a.km-b.km);
+if(logs.length<2)return null;
+let totalKm=0,totalLiter=0;
+for(let i=1;i<logs.length;i++){
+const kmDiff=logs[i].km-logs[i-1].km;
+if(kmDiff<=0)continue;
+totalKm+=kmDiff;totalLiter+=logs[i].liter;
+}
+if(totalKm<=0||totalLiter<=0)return null;
+const kmPerLiter=totalKm/totalLiter;
+const recentHarga=(D.bbmLogs||[]).filter(b=>b.vehicleId===vehicleId&&b.harga>0).slice(-10);
+if(!recentHarga.length)return null;
+const avgHarga=recentHarga.reduce((s,b)=>s+b.harga,0)/recentHarga.length;
+return{rpPerKm:avgHarga/kmPerLiter,kmPerLiter,avgHarga};
+}
 function servisLogMatchesCat(s,cat){
 if(s.categoryId) return s.categoryId===cat.id;
 const cn=cat.name.toLowerCase();

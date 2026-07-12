@@ -56,6 +56,9 @@ function baseFields(overrides = {}) {
     'shopList', 'shopRecentList', 'shopTo', 'customerDetailBody', 'customerDetailTitle',
     'customerList', 'oAcc', 'oCustAddr', 'oCustHint', 'oCustName', 'oCustPhone', 'oDate',
     'oDelivered', 'oDeliveredLbl', 'oDiskon', 'oNote', 'oOngkir', 'oPriceType', 'oProductSelect',
+    'ongkirBiayaKonsumen', 'ongkirBiayaProdusen', 'ongkirBreakdown', 'ongkirCalcPanel',
+    'ongkirEtape2Fields', 'ongkirKmKonsumen', 'ongkirKmProdusen', 'ongkirPcs', 'ongkirResult',
+    'ongkirProdusenPrefHint',
     'oProfitDisplay', 'oTotalDisplay', 'orderItemList', 'pAcc', 'pAccHint', 'pBeli', 'pDiskon',
     'pJual', 'pKategori', 'pKategoriList', 'pName', 'pProdusen', 'pReseller', 'pStock',
     'prContact', 'prName', 'prNote', 'priceRekoPanel', 'priceRekoWidgetCard', 'priceRekoWidgetList',
@@ -106,7 +109,7 @@ function makeCtx(D, opts = {}) {
     renderKeuangan: opts.renderKeuangan || record('renderKeuangan'),
     Kasir: opts.Kasir || { render: record('Kasir.render') },
   }, [
-    'Etalase', 'PriceReko', 'PriceRekoWidget', 'StockRekoWidget', 'Produsen',
+    'Etalase', 'PriceReko', 'OngkirCalc', 'PriceRekoWidget', 'StockRekoWidget', 'Produsen',
     'SiapPulang', 'Order', 'Laporan', 'Pelanggan',
   ]);
   return { ctx, fakeDocument, calls };
@@ -487,6 +490,208 @@ test('PriceReko.checkMarketAI — AI tidak yakin (min null) => info peringatan, 
   assert.ok(fakeDocument.getElementById('prkMarketInfo').textContent.includes('tidak menemukan'));
 });
 
+// ================= OngkirCalc =================
+
+test('OngkirCalc.leg — (ongkos/km × jarak) ÷ pcs, 0 kalau pcs<=0', () => {
+  const { ctx } = makeCtx(baseD());
+  assert.equal(ctx.OngkirCalc.leg(3000, 20, 20), 3000); // (3000*20)/20 = 3000
+  assert.equal(ctx.OngkirCalc.leg(3000, 20, 0), 0);
+  assert.equal(ctx.OngkirCalc.leg('', '', 10), 0);
+});
+
+test('OngkirCalc.calc — metode "antar" (default): jumlahkan etape produsen + etape konsumen', () => {
+  const { ctx, fakeDocument } = makeCtx(baseD(), {
+    domValues: {
+      ongkirKmProdusen: { value: '20' }, ongkirBiayaProdusen: { value: '3000' },
+      ongkirKmKonsumen: { value: '10' }, ongkirBiayaKonsumen: { value: '3000' },
+      ongkirPcs: { value: '20' },
+    },
+  });
+  const total = ctx.OngkirCalc.calc();
+  // etape produsen (3000*20)/20=3000 + etape konsumen (3000*10)/20=1500 => 4500
+  assert.equal(total, 4500);
+  assert.equal(fakeDocument.getElementById('ongkirResult').textContent, 'RpFull4500');
+  const bd = fakeDocument.getElementById('ongkirBreakdown').textContent;
+  assert.ok(bd.includes('Ambil-Produsen'));
+  assert.ok(bd.includes('Pekalongan-Rumah'));
+  assert.ok(bd.includes('20 pcs'));
+});
+
+test('OngkirCalc.calc — metode "ambil": etape konsumen di-skip (konsumen ambil sendiri di Pekalongan)', () => {
+  const { ctx, fakeDocument } = makeCtx(baseD(), {
+    domValues: {
+      ongkirKmProdusen: { value: '20' }, ongkirBiayaProdusen: { value: '3000' },
+      ongkirKmKonsumen: { value: '10' }, ongkirBiayaKonsumen: { value: '3000' },
+      ongkirPcs: { value: '20' },
+    },
+  });
+  ctx.OngkirCalc._metode = 'ambil';
+  const total = ctx.OngkirCalc.calc();
+  assert.equal(total, 3000); // cuma etape produsen
+  const bd = fakeDocument.getElementById('ongkirBreakdown').textContent;
+  assert.ok(!bd.includes('Pekalongan-Rumah'));
+});
+
+test('OngkirCalc.calc — pcs kosong => breakdown minta isi pcs dulu, hasil 0', () => {
+  const { ctx, fakeDocument } = makeCtx(baseD(), {
+    domValues: { ongkirKmProdusen: { value: '20' }, ongkirBiayaProdusen: { value: '3000' } },
+  });
+  const total = ctx.OngkirCalc.calc();
+  assert.equal(total, 0);
+  assert.ok(fakeDocument.getElementById('ongkirBreakdown').textContent.includes('Isi jumlah pcs'));
+});
+
+test('OngkirCalc.setMetode — ganti active class di toggle & nonaktifkan field etape 2 saat "ambil"', () => {
+  const { createFakeElement } = require('./helpers/fakeDom');
+  const btnAntar = createFakeElement({ classList: ['chip-btn', 'active'] });
+  const btnAmbil = createFakeElement({ classList: ['chip-btn'] });
+  const { ctx, fakeDocument } = makeCtx(baseD(), {
+    queryGroups: { '#ongkirMetodeToggle .chip-btn': [btnAntar, btnAmbil] },
+  });
+  ctx.OngkirCalc.setMetode('ambil', btnAmbil);
+  assert.equal(ctx.OngkirCalc._metode, 'ambil');
+  assert.equal(btnAntar.classList.contains('active'), false);
+  assert.equal(btnAmbil.classList.contains('active'), true);
+  assert.equal(fakeDocument.getElementById('ongkirKmKonsumen').disabled, true);
+  assert.equal(fakeDocument.getElementById('ongkirBiayaKonsumen').disabled, true);
+});
+
+test('OngkirCalc.applyToTransport — total 0 => toast peringatan, tidak isi prkTransport', () => {
+  const { ctx, fakeDocument, calls } = makeCtx(baseD());
+  ctx.OngkirCalc.applyToTransport();
+  assert.equal(fakeDocument.getElementById('prkTransport').value, '');
+  assert.ok(calls.toast.some((m) => m.includes('Isi jarak')));
+});
+
+test('OngkirCalc.applyToTransport — hasil dibulatkan ke ratusan terdekat & mengisi prkTransport, lalu PriceReko.calc ulang', () => {
+  const { ctx, fakeDocument } = makeCtx(baseD(), {
+    domValues: {
+      ongkirKmProdusen: { value: '15' }, ongkirBiayaProdusen: { value: '2000' }, // (2000*15)/10=3000
+      ongkirPcs: { value: '10' },
+      pBeli: { value: '10000' }, prkMargin: { value: '50' },
+    },
+  });
+  ctx.OngkirCalc._metode = 'ambil';
+  ctx.OngkirCalc.applyToTransport();
+  assert.equal(fakeDocument.getElementById('prkTransport').value, 3000);
+  // PriceReko.calc ikut jalan ulang pakai transport baru: (10000+3000)*1.5=19500 -> roundNice step 500 => 19500
+  assert.equal(fakeDocument.getElementById('prkResult').textContent, 'RpFull19500');
+});
+
+// ================= OngkirCalc — preferensi jarak per Produsen (kw192) =================
+
+test('OngkirCalc.prefillFromProdusen — tanpa produsen dipilih: hint kosong, field tidak diisi', () => {
+  const D = baseD({ produsen: [{ id: 'prd1', name: 'UD Batu Alam' }] });
+  const { ctx, fakeDocument } = makeCtx(D, { domValues: { pProdusen: { value: '' } } });
+  ctx.OngkirCalc.prefillFromProdusen();
+  assert.equal(fakeDocument.getElementById('ongkirKmProdusen').value, '');
+  assert.equal(fakeDocument.getElementById('ongkirProdusenPrefHint').textContent, '');
+});
+
+test('OngkirCalc.prefillFromProdusen — produsen dipilih tapi belum ada rute tersimpan: hint ajak isi & simpan', () => {
+  const D = baseD({ produsen: [{ id: 'prd1', name: 'UD Batu Alam' }] });
+  const { ctx, fakeDocument } = makeCtx(D, { domValues: { pProdusen: { value: 'prd1' } } });
+  ctx.OngkirCalc.prefillFromProdusen();
+  assert.equal(fakeDocument.getElementById('ongkirKmProdusen').value, '');
+  assert.ok(fakeDocument.getElementById('ongkirProdusenPrefHint').textContent.includes('Belum ada rute tersimpan'));
+  assert.ok(fakeDocument.getElementById('ongkirProdusenPrefHint').textContent.includes('UD Batu Alam'));
+});
+
+test('OngkirCalc.prefillFromProdusen — rute tersimpan otomatis isi field kosong & tampilkan hint', () => {
+  const D = baseD({ produsen: [{ id: 'prd1', name: 'UD Batu Alam', jarakKm: 20, biayaPerKm: 3000 }] });
+  const { ctx, fakeDocument } = makeCtx(D, { domValues: { pProdusen: { value: 'prd1' } } });
+  ctx.OngkirCalc.prefillFromProdusen();
+  assert.equal(fakeDocument.getElementById('ongkirKmProdusen').value, 20);
+  assert.equal(fakeDocument.getElementById('ongkirBiayaProdusen').value, 3000);
+  const hint = fakeDocument.getElementById('ongkirProdusenPrefHint').textContent;
+  assert.ok(hint.includes('Rute tersimpan'));
+  assert.ok(hint.includes('UD Batu Alam'));
+});
+
+test('OngkirCalc.prefillFromProdusen — TIDAK menimpa field yang sudah diisi manual', () => {
+  const D = baseD({ produsen: [{ id: 'prd1', name: 'UD Batu Alam', jarakKm: 20, biayaPerKm: 3000 }] });
+  const { ctx, fakeDocument } = makeCtx(D, {
+    domValues: { pProdusen: { value: 'prd1' }, ongkirKmProdusen: { value: '99' } },
+  });
+  ctx.OngkirCalc.prefillFromProdusen();
+  assert.equal(fakeDocument.getElementById('ongkirKmProdusen').value, '99'); // tidak ditimpa
+  assert.equal(fakeDocument.getElementById('ongkirBiayaProdusen').value, 3000); // ini kosong, jadi diisi
+});
+
+test('OngkirCalc.saveProdusenPref — tanpa produsen dipilih: toast peringatan, tidak menyimpan', () => {
+  const D = baseD({ produsen: [{ id: 'prd1', name: 'UD Batu Alam' }] });
+  const { ctx, calls } = makeCtx(D, {
+    domValues: { pProdusen: { value: '' }, ongkirKmProdusen: { value: '20' } },
+  });
+  ctx.OngkirCalc.saveProdusenPref();
+  assert.ok(calls.toast.some((m) => m.includes('Pilih Produsen dulu')));
+  assert.equal(calls.save, 0);
+});
+
+test('OngkirCalc.saveProdusenPref — jarak kosong/0: toast peringatan, tidak menyimpan', () => {
+  const D = baseD({ produsen: [{ id: 'prd1', name: 'UD Batu Alam' }] });
+  const { ctx, calls } = makeCtx(D, { domValues: { pProdusen: { value: 'prd1' } } });
+  ctx.OngkirCalc.saveProdusenPref();
+  assert.ok(calls.toast.some((m) => m.includes('Isi Jarak')));
+  assert.equal(calls.save, 0);
+  assert.equal(D.produsen[0].jarakKm, undefined);
+});
+
+test('OngkirCalc.saveProdusenPref — simpan jarak & ongkos/km ke Produsen terpilih, lalu toast sukses & refresh hint', () => {
+  const D = baseD({ produsen: [{ id: 'prd1', name: 'UD Batu Alam' }] });
+  const { ctx, fakeDocument, calls } = makeCtx(D, {
+    domValues: { pProdusen: { value: 'prd1' }, ongkirKmProdusen: { value: '25' }, ongkirBiayaProdusen: { value: '3500' } },
+  });
+  ctx.OngkirCalc.saveProdusenPref();
+  assert.equal(D.produsen[0].jarakKm, 25);
+  assert.equal(D.produsen[0].biayaPerKm, 3500);
+  assert.equal(calls.save, 1);
+  assert.ok(calls.toast.some((m) => m.includes('Rute ke UD Batu Alam disimpan')));
+  assert.ok(fakeDocument.getElementById('ongkirProdusenPrefHint').textContent.includes('Rute tersimpan'));
+});
+
+test('OngkirCalc.saveProdusenPref — ongkos/km boleh kosong (hanya jarak yang wajib)', () => {
+  const D = baseD({ produsen: [{ id: 'prd1', name: 'UD Batu Alam' }] });
+  const { ctx } = makeCtx(D, {
+    domValues: { pProdusen: { value: 'prd1' }, ongkirKmProdusen: { value: '25' } },
+  });
+  ctx.OngkirCalc.saveProdusenPref();
+  assert.equal(D.produsen[0].jarakKm, 25);
+  assert.equal(D.produsen[0].biayaPerKm, 0);
+});
+
+test('OngkirCalc.toggle — saat panel dibuka, otomatis prefill dari preferensi Produsen', () => {
+  const D = baseD({ produsen: [{ id: 'prd1', name: 'UD Batu Alam', jarakKm: 12, biayaPerKm: 2500 }] });
+  const { ctx, fakeDocument } = makeCtx(D, {
+    domValues: { pProdusen: { value: 'prd1' }, ongkirCalcPanel: { classList: { contains: () => true, toggle() {}, add() {}, remove() {} } } },
+  });
+  ctx.OngkirCalc.toggle();
+  assert.equal(fakeDocument.getElementById('ongkirKmProdusen').value, 12);
+  assert.equal(fakeDocument.getElementById('ongkirBiayaProdusen').value, 2500);
+});
+
+test('Etalase.onProdusenChange — ganti Produsen: reset Etape1 lalu isi ulang dari preferensi Produsen baru', async () => {
+  const D = baseD({
+    products: [{ id: 'p1', name: 'Shop A', hargaByProdusen: {} }],
+    produsen: [
+      { id: 'prd1', name: 'UD Batu Alam', jarakKm: 10, biayaPerKm: 2000 },
+      { id: 'prd2', name: 'CV Sumber Batu', jarakKm: 30, biayaPerKm: 4000 },
+    ],
+  });
+  const { ctx, fakeDocument } = makeCtx(D, {
+    domValues: {
+      pProdusen: { value: 'prd2' },
+      ongkirKmProdusen: { value: '10' }, // sisa dari produsen sebelumnya (prd1)
+      ongkirBiayaProdusen: { value: '2000' },
+    },
+  });
+  ctx.Etalase.editIdx = 0;
+  await ctx.Etalase.onProdusenChange();
+  // field ke-reset dulu lalu diisi ulang dari prd2 (BUKAN nilai lama prd1 yang nyangkut)
+  assert.equal(fakeDocument.getElementById('ongkirKmProdusen').value, 30);
+  assert.equal(fakeDocument.getElementById('ongkirBiayaProdusen').value, 4000);
+});
+
 // ================= PriceRekoWidget =================
 
 test('PriceRekoWidget.avgTransport — rata-rata harga BBM 10 log terakhir', () => {
@@ -505,6 +710,32 @@ test('PriceRekoWidget.avgMarginForKategori — exclude produk itu sendiri, fallb
   const { ctx } = makeCtx(D);
   assert.equal(ctx.PriceRekoWidget.avgMarginForKategori('k1', 'p1'), 50); // hanya p1 diexclude, p2 margin 0 -> difilter -> fallback 50
   assert.equal(ctx.PriceRekoWidget.avgMarginForKategori('k_kosong', null), 50);
+});
+
+test('PriceRekoWidget.checkOne — produk belum punya Harga Beli/Jual => null', () => {
+  const D = baseD({ products: [] });
+  const { ctx } = makeCtx(D);
+  assert.equal(ctx.PriceRekoWidget.checkOne({ id: 'p1', hargaBeli: 0, hargaJual: 50000 }), null);
+  assert.equal(ctx.PriceRekoWidget.checkOne({ id: 'p1', hargaBeli: 10000, hargaJual: 0 }), null);
+  assert.equal(ctx.PriceRekoWidget.checkOne(null), null);
+});
+
+test('PriceRekoWidget.checkOne — selisih di bawah THRESHOLD_PCT => null; di atas => {reko,diffPct}', () => {
+  // p1 & p2 sengaja beda kategori (tanpa produk lain sekategori) supaya
+  // avgMarginForKategori masing2 jatuh ke fallback 50% yg independen, tidak saling
+  // mempengaruhi rekomendasi satu sama lain.
+  const D = baseD({
+    products: [
+      { id: 'p1', kategoriId: 'k1', hargaBeli: 10000, hargaJual: 15000 }, // persis di estimasi (margin fallback 50%)
+      { id: 'p2', kategoriId: 'k2', hargaBeli: 10000, hargaJual: 50000 }, // jauh di atas estimasi (15000)
+    ],
+  });
+  const { ctx } = makeCtx(D);
+  assert.equal(ctx.PriceRekoWidget.checkOne(D.products[0]), null);
+  const chk = ctx.PriceRekoWidget.checkOne(D.products[1]);
+  assert.ok(chk);
+  assert.equal(chk.reko, 15000);
+  assert.ok(chk.diffPct > 0); // harga sekarang di ATAS estimasi
 });
 
 test('PriceRekoWidget.scan — tandai produk yg menyimpang >= threshold dari rekomendasi', () => {
@@ -857,6 +1088,31 @@ test('Order._saveInner — stok tidak cukup => gagal, toast pesan dari recordSho
   assert.equal(D.cobek.length, 0);
   assert.equal(D.transactions.length, 0);
   assert.ok(calls.toast[0].includes('tidak cukup'));
+});
+
+test('Order.renderItems — item yg hargaJual-nya jauh menyimpang dari reko PriceRekoWidget => muncul hint "Reko Etalase"', () => {
+  const D = baseD({
+    accounts: [{ id: 'acc1', emoji: '💰', name: 'Kas' }],
+    products: [{ id: 'p1', name: 'Shop Mahal', kategoriId: 'k1', stock: 10, hargaBeli: 10000, hargaJual: 50000 }],
+  });
+  const { ctx, fakeDocument } = makeCtx(D);
+  ctx.Order.items = [{ productId: 'p1', qty: 1, hargaOverride: null }];
+  ctx.Order.renderItems();
+  const html = fakeDocument.getElementById('orderItemList').innerHTML;
+  assert.ok(html.includes('Reko Etalase'));
+  assert.ok(html.includes('openPriceRekoWidgetDetail'));
+});
+
+test('Order.renderItems — item yg harganya wajar (dekat estimasi) => tidak ada hint reko', () => {
+  const D = baseD({
+    accounts: [{ id: 'acc1', emoji: '💰', name: 'Kas' }],
+    products: [{ id: 'p1', name: 'Shop Wajar', kategoriId: 'k1', stock: 10, hargaBeli: 10000, hargaJual: 15000 }],
+  });
+  const { ctx, fakeDocument } = makeCtx(D);
+  ctx.Order.items = [{ productId: 'p1', qty: 1, hargaOverride: null }];
+  ctx.Order.renderItems();
+  const html = fakeDocument.getElementById('orderItemList').innerHTML;
+  assert.ok(!html.includes('Reko Etalase'));
 });
 
 test('Order.rowHTML — transaksi baru (items) vs data lama (sets)', () => {

@@ -13,6 +13,71 @@
 
 ## SUDAH SELESAI (terverifikasi)
 
+- ✅ **[2026-07-12] Integrasi Kasir/Order dengan `priceRekoWidgetList` (kw194-kasir-order-pricereko, build #194).**
+  Lanjutan dari item "Ide lanjutan yang BELUM dikerjakan" di entri OngkirCalc di bawah: widget
+  "🤖 Rekomendasi Harga Jual AI" (`PriceRekoWidget`) sebelumnya HANYA kelihatan di tab Etalase —
+  kasir yang checkout langsung dari tab 🧠 Kasir atau form 🛒 Transaksi Manual (Order) tidak tahu
+  kalau harga jual sebuah produk sudah menyimpang jauh dari estimasi, kecuali sengaja buka Etalase
+  dulu.
+  **Perubahan** (`cobek.js` + `kasir.js` + `styles.css`):
+  1. `PriceRekoWidget.checkOne(p)` (baru, `cobek.js`) — versi per-produk dari `scan()`, balikin
+     `{reko,diffPct}` kalau produk menyimpang ≥`THRESHOLD_PCT` dari estimasi, atau `null` kalau
+     wajar/belum ada Harga Beli-Jual. `scan()` di-refactor supaya reuse fungsi ini (bukan
+     reimplementasi rumus 2x) — SATU sumber kebenaran rumus reko dipakai Etalase, Kasir, & Order.
+  2. `Kasir.renderGrid()` — tile produk yang flagged dapat badge ⬇️/⬆️ (elemen `<button>` terpisah
+     pojok kiri-atas tile, class `.kasir-tile-pricewarn`, BUKAN nempel ke `data-action` tile itu
+     sendiri supaya tap badge tidak ikut nge-trigger `addToCart`) — tap badge memanggil
+     `Kasir.openPriceReko(pid)` yang delegasi ke `PriceRekoWidget.openDetail()` yang sudah ada
+     (buka `productModal` produk itu, auto-expand panel Rekomendasi Harga Jual).
+  3. `Kasir.renderCart()` — baris keranjang yang flagged dapat hint teks kecil "Reko Etalase: RpX"
+     di bawah nama produk.
+  4. `Order.renderItems()` (form 🛒 Transaksi Manual lama, `cobek.js`) — baris item yang flagged
+     dapat hint sama ("Reko Etalase: RpX") + link "detail →" yang memanggil
+     `openPriceRekoWidgetDetail(pid)` (wrapper `PriceRekoWidget.openDetail` yang sudah ada).
+  5. CSS baru `.kasir-tile-pricewarn` di `styles.css` (badge bulat kecil, posisi absolute pojok
+     kiri-atas, mirror `.kasir-tile-badge` yang sudah ada di pojok kanan-atas utk qty keranjang).
+  Modul `Kasir` (POS) TIDAK diubah alur checkout/`recordShopSale`-nya sama sekali — murni tambahan
+  visual+link ke alur yang sudah ada, konsisten dgn rumus & UX "🔍 Detail" yang sudah dipakai widget
+  Etalase.
+  **Verifikasi:** 2 test baru `PriceRekoWidget.checkOne()` + 2 test baru `Order.renderItems()`
+  ditambahkan ke `tests/cobek.test.js`; file test baru `tests/kasir.test.js` (12 test, `kasir.js`
+  sebelumnya nol test sama sekali) mencakup badge/hint reko baru DI ATAS jalur inti Kasir
+  (`renderGrid`/`renderCart`/`addToCart`/`computeTotals`/`_checkoutInner` sukses & gagal). `npm
+  test` → 1059/1059 pass (naik dari 1043). `node build.js` → sukses, versi naik ke build #194.
+  Belum sempat smoke-test browser (Playwright) sesi ini — perlu dicoba visual (khususnya tap badge
+  ⬆️/⬇️ di tile Kasir tidak ikut nge-trigger tambah ke keranjang) sebelum dianggap 100% final, tapi
+  logic inti sudah diverifikasi lewat unit test. `npm run lint` juga belum bisa dijalankan (sandbox
+  tanpa akses internet).
+
+- ✅ **[2026-07-12] Preferensi jarak/ongkos per Produsen di OngkirCalc (kw192-ongkir-produsen-pref, build #193).**
+  Lanjutan dari `PriceReko`/`OngkirCalc` (kw190/191): sebelumnya tiap buka panel "📍 Hitung dari
+  Jarak & Ongkir" di `productModal`, field Etape 1 (Jarak km & Ongkos/km "Ambil ke Produsen") selalu
+  kosong walau produknya dari produsen yang SAMA dengan sebelumnya — padahal jarak rute ke 1 produsen
+  kan tetap, cuma jumlah pcs/etape 2 (ke rumah konsumen) yang beda-beda tiap order.
+  **Perubahan** (`cobek.js` + `modals.js`):
+  1. `D.produsen[].jarakKm`/`.biayaPerKm` (field baru, opsional) menyimpan rute Etape 1 per produsen.
+  2. `OngkirCalc.prefillFromProdusen()`: dipanggil saat panel Ongkir dibuka (`toggle()`) & saat ganti
+     Produsen (`Etalase.onProdusenChange()`) — isi otomatis field jarak/ongkos KALAU kosong (tidak
+     menimpa input manual yang sudah ada), plus tampilkan hint di `#ongkirProdusenPrefHint` (baru,
+     di atas field Etape 1 di `modals.js`).
+  3. `OngkirCalc.saveProdusenPref()`: link baru "💾 Simpan sbg rute tetap Produsen ini" di bawah
+     field Etape 1 — validasi Produsen & Jarak terisi, simpan ke `D.produsen`, toast konfirmasi.
+  4. Ganti Produsen di dropdown `pProdusen` sekarang RESET dulu field Etape 1 lalu isi ulang dari
+     preferensi produsen yang baru dipilih (bukan nyisa dari produsen sebelumnya).
+  5. `Produsen.renderList()` (tab Bisnis Shop → Produsen) menampilkan rute tersimpan (📍 X km × Rp/km)
+     di baris info produsen kalau sudah ada.
+  Etape 2 (Pekalongan→Rumah Konsumen) SENGAJA TIDAK disimpan per produsen karena beda-beda tiap order.
+  **Verifikasi:** 12 test baru ditambahkan di `tests/cobek.test.js` (prefill kosong/ada-rute/tidak-
+  menimpa-input-manual, saveProdusenPref validasi & sukses, toggle() & onProdusenChange() memanggil
+  prefill). `npm test` → 1043/1043 pass (naik dari 1033, +10 di cobek.test.js karena beberapa test
+  digabung). `node build.js` → sukses, versi naik ke build #193. Belum sempat smoke-test browser
+  (Playwright) sesi ini — perlu dicoba visual sebelum dianggap 100% final, tapi logic inti sudah
+  diverifikasi lewat unit test.
+  **Ide lanjutan yang BELUM dikerjakan (dari daftar user)**: buffer % susut/pecah di kalkulasi harga
+  (PriceReko/OngkirCalc belum memperhitungkan barang pecah/rusak saat transport), dan integrasi
+  Kasir/Order dengan `priceRekoWidgetList` (widget rekomendasi harga di Etalase belum terhubung ke
+  alur POS Kasir).
+
 - ✅ **[2026-07-11] 2 bug dari laporan screenshot user (build v188): renderDashboard() crash
   "Cannot set properties of null (setting 'textContent')" & toast "Tombol ini belum berfungsi
   (setCobekTab)".**

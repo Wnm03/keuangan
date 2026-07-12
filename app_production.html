@@ -53,7 +53,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <title>Keluarga W</title>
-<link rel="stylesheet" href="styles.css?v=189">
+<link rel="stylesheet" href="styles.css?v=205">
 <script>
 /* Debug console (Eruda) — aktifkan sekali lewat ?debug=1 di URL, nempel via localStorage.
    Matikan lagi lewat ?debug=0. Tidak aktif buat user biasa. */
@@ -105,8 +105,8 @@ b.appendChild(closeBtn);
 }catch(_e){ console.error('Gagal tampilkan banner error modul:',_e); }
 };
 </script>
-<script src="app-bundle-a.min.js?v=189" onerror="window.__moduleLoadFail('app-bundle-a.min.js')"></script>
-<script src="smoke-test.js?v=189" defer></script>
+<script src="app-bundle-a.min.js?v=205" onerror="window.__moduleLoadFail('app-bundle-a.min.js')"></script>
+<script src="smoke-test.js?v=205" defer></script>
 <link rel="manifest" id="pwaManifestLink" href="manifest.json">
 </head>
 <body data-theme="dark">
@@ -739,7 +739,7 @@ b.appendChild(closeBtn);
 <div class="page" id="page-shop">
   <div class="page-settings-btn">
     <div class="page-title">🪨 Bisnis Shop</div>
-    <button class="qs-btn" data-action="openQS" data-args='["qsShop"]' aria-label="Buka menu cepat"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg> ⚙️</button>
+    <button class="qs-btn" data-action="openQS" data-args='["qsShop"]' aria-label="Buka menu cepat"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg> Atur</button>
   </div>
   <div class="shop-grid">
     <div class="shop-stat clickable" data-action="goToList" data-args='["shopList", null, null, "riwayat"]'><div class="shop-val" id="cTrip">0</div><div class="shop-lbl">Transaksi</div></div>
@@ -756,16 +756,27 @@ b.appendChild(closeBtn);
     <button class="cn-tab tab-fixed-pad" data-action="setShopTab" data-args='["pelanggan", "$el"]'>👤 Pelanggan</button>
   </div>
 
-  <!-- KASIR AI (baru, v127) -->
-  <div id="shopTab-kasir">
-    <div class="search-wrap u-mb10">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="position:absolute;left:13px;top:50%;transform:translateY(-50%);width:16px;height:16px;color:var(--text3)"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-      <input class="fi" id="kasirSearch" style="padding-left:38px" placeholder="Cari produk..." oninput="Kasir.onSearch(this.value)" autocomplete="off">
+  <!-- KASIR AI (baru, v127; redesign tampilan profesional di v196, kw196-kasir-pro-redesign) -->
+  <div id="shopTab-kasir" class="kasir-wrap">
+    <div class="kasir-toolbar">
+      <div class="search-wrap u-mb10">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="position:absolute;left:13px;top:50%;transform:translateY(-50%);width:16px;height:16px;color:var(--text3)"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+        <input class="fi" id="kasirSearch" style="padding-left:38px" placeholder="Cari produk..." oninput="Kasir.onSearch(this.value)" autocomplete="off">
+      </div>
+      <div class="u-flex u-gap8" style="align-items:center">
+        <div class="u-flex u-gap8 u-flex1" id="kasirPriceToggle">
+          <button type="button" class="chip-btn active u-flex1" data-action="Kasir.setPriceType" data-args='["jual", "$el"]'>Harga Jual</button>
+          <button type="button" class="chip-btn u-flex1" data-action="Kasir.setPriceType" data-args='["reseller", "$el"]'>Harga Reseller</button>
+        </div>
+        <div class="u-flex u-gap6 kasir-view-toggle" id="kasirViewToggle">
+          <button type="button" class="chip-btn active" data-view="grid" data-action="Kasir.setViewMode" data-args='["grid", "$el"]' title="Tampilan grid" aria-label="Tampilan grid">▦</button>
+          <button type="button" class="chip-btn" data-view="list" data-action="Kasir.setViewMode" data-args='["list", "$el"]' title="Tampilan list ringkas" aria-label="Tampilan list ringkas">☰</button>
+        </div>
+      </div>
     </div>
-    <div class="u-flex u-gap8 u-mb10" id="kasirPriceToggle">
-      <button type="button" class="chip-btn active u-flex1" data-action="Kasir.setPriceType" data-args='["jual", "$el"]'>Harga Jual</button>
-      <button type="button" class="chip-btn u-flex1" data-action="Kasir.setPriceType" data-args='["reseller", "$el"]'>Harga Reseller</button>
-    </div>
+
+    <div class="kasir-kat-chips" id="kasirKategoriChips" style="display:none"></div>
+
     <div class="kasir-grid" id="kasirGrid"></div>
 
     <div class="card u-mt12" id="kasirAiCard" style="display:none">
@@ -773,28 +784,44 @@ b.appendChild(closeBtn);
       <div id="kasirAiBody"></div>
     </div>
 
-    <div class="div"></div>
-    <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">🛒 Keranjang <button type="button" class="card-setting-btn" data-action="Kasir.aiSuggest">🤖 Saran AI</button></div>
-    <div id="kasirCartList" class="u-mb10"></div>
+    <div class="kasir-cart-card u-mt12" id="kasirCheckoutSection">
+      <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">🛒 Keranjang <button type="button" class="card-setting-btn" data-action="Kasir.aiSuggest">🤖 Saran AI</button></div>
+      <div id="kasirCartList" class="u-mb10"></div>
 
-    <div class="u-grid2">
-      <div class="fg"><label class="fl">Diskon (Rp)</label><input type="number" class="fi" id="kasirDiskon" placeholder="0" inputmode="numeric" oninput="Kasir.renderCart()"></div>
-      <div class="fg"><label class="fl">Ongkos Kirim (Rp)</label><input type="number" class="fi" id="kasirOngkir" placeholder="0" inputmode="numeric" oninput="Kasir.renderCart()"></div>
-    </div>
-    <div class="fg"><label class="fl">Nama Pembeli (opsional)</label><input type="text" class="fi" id="kasirCustName" placeholder="Bu Rina" autocomplete="off"></div>
-    <div class="fg"><label class="fl">No. HP (opsional)</label><input type="text" class="fi" id="kasirCustPhone" placeholder="08xx" autocomplete="off"></div>
-    <div class="fg"><label class="fl">Uang Masuk ke Akun</label><select class="fs" id="kasirAcc"></select></div>
-    <div class="fg"><label class="fl">Catatan (opsional)</label><input type="text" class="fi" id="kasirNote" placeholder="Catatan tambahan..."></div>
+      <div class="kasir-cart-fields">
+        <div class="u-grid2">
+          <div class="fg"><label class="fl">Diskon (Rp)</label><input type="number" class="fi" id="kasirDiskon" placeholder="0" inputmode="numeric" oninput="Kasir.renderCart()"></div>
+          <div class="fg"><label class="fl">Ongkos Kirim (Rp)</label><input type="number" class="fi" id="kasirOngkir" placeholder="0" inputmode="numeric" oninput="Kasir.renderCart()"></div>
+        </div>
+        <div class="fg"><label class="fl">Nama Pembeli (opsional)</label><input type="text" class="fi" id="kasirCustName" placeholder="Bu Rina" autocomplete="off"></div>
+        <div class="fg"><label class="fl">No. HP (opsional)</label><input type="text" class="fi" id="kasirCustPhone" placeholder="08xx" autocomplete="off"></div>
+        <div class="fg"><label class="fl">Uang Masuk ke Akun</label><select class="fs" id="kasirAcc"></select></div>
+        <div class="fg u-mb0"><label class="fl">Catatan (opsional)</label><input type="text" class="fi" id="kasirNote" placeholder="Catatan tambahan..."></div>
+      </div>
 
-    <div class="gaji-result" style="display:block;margin-bottom:14px">
-      <div style="font-size:12px;color:var(--text2);margin-bottom:4px">Total Tagihan</div>
-      <div class="gaji-result-main" id="kasirTotalDisplay">Rp 0</div>
-      <div id="kasirProfitDisplay" style="font-size:12px;color:var(--text2);margin-top:4px">Estimasi untung: Rp 0</div>
+      <div class="kasir-receipt">
+        <div class="kasir-receipt-row"><span>Subtotal</span><span id="kasirSubDisplay">Rp 0</span></div>
+        <div class="kasir-receipt-row" id="kasirDiskonRow" style="display:none"><span>Diskon</span><span class="u-cacc2" id="kasirDiskonDisplay">− Rp 0</span></div>
+        <div class="kasir-receipt-row" id="kasirOngkirRow" style="display:none"><span>Ongkos Kirim</span><span id="kasirOngkirDisplay">+ Rp 0</span></div>
+        <div class="kasir-receipt-total">
+          <span>Total Tagihan</span>
+          <span id="kasirTotalDisplay">Rp 0</span>
+        </div>
+        <div id="kasirProfitDisplay" class="kasir-receipt-profit">Estimasi untung: Rp 0</div>
+      </div>
+      <button class="btn btn-primary btn-full u-p14" id="kasirCheckoutBtn" data-action="Kasir.checkout" disabled>✅ Bayar &amp; Simpan Transaksi</button>
+      <div class="u-flex u-gap8 u-mt8">
+        <button class="btn btn-ghost btn-full btn-sm" data-action="Kasir.shareReceipt">📤 Bagikan Struk</button>
+        <button class="btn btn-ghost btn-full btn-sm" data-action="Kasir.reset">🗑 Kosongkan</button>
+      </div>
     </div>
-    <button class="btn btn-primary btn-full u-p14" id="kasirCheckoutBtn" data-action="Kasir.checkout" disabled>✅ Bayar &amp; Simpan Transaksi</button>
-    <div class="u-flex u-gap8 u-mt8">
-      <button class="btn btn-ghost btn-full btn-sm" data-action="Kasir.shareReceipt">📤 Bagikan Struk</button>
-      <button class="btn btn-ghost btn-full btn-sm" data-action="Kasir.reset">🗑 Kosongkan</button>
+
+    <div class="kasir-floatbar" id="kasirFloatbar" data-action="Kasir.scrollToCheckout">
+      <div class="kasir-floatbar-info">
+        <span class="kasir-floatbar-count" id="kasirFloatCount">0 item</span>
+        <span class="kasir-floatbar-total" id="kasirFloatTotal">Rp 0</span>
+      </div>
+      <span class="kasir-floatbar-cta">Bayar →</span>
     </div>
   </div>
 
@@ -807,6 +834,7 @@ b.appendChild(closeBtn);
   <!-- ETALASE -->
   <div id="shopTab-etalase" class="u-dnone">
     <button class="btn btn-primary btn-full" style="padding:14px;margin:12px 0" data-action="openProductModal" aria-label="Edit/Buka">+ Tambah Produk</button>
+    <button class="btn btn-ghost btn-full btn-sm u-mb8" data-action="openImportKatalogModal">📋 Import Katalog & Harga</button>
     <div class="u-fs12 u-t2 u-mb8">💡 Stok juga otomatis bertambah kalau kamu catat pengeluaran kategori "Bisnis" sub "Shop" di tab Keuangan — 2 arah, tetap sinkron.</div>
     <div class="card" id="priceRekoWidgetCard" style="display:none">
       <div class="card-title">🤖 Rekomendasi Harga Jual AI</div>
@@ -2112,7 +2140,8 @@ b.appendChild(closeBtn);
 <!-- MODAL: Budget Settings -->
 <script>document.write(MODAL_HTML[64]);</script><!-- modal:budgetSettingsModal externalized to modals.js -->
 <script>document.write(MODAL_HTML[65]);</script><!-- modal:refleksiModal (Refleksi & Self-Care) -->
+<script>document.write(MODAL_HTML[66]);</script><!-- modal:importKatalogModal (Import Katalog & Harga) -->
 
-<script src="app-bundle-b.min.js?v=189" onerror="window.__moduleLoadFail('app-bundle-b.min.js')"></script>
+<script src="app-bundle-b.min.js?v=205" onerror="window.__moduleLoadFail('app-bundle-b.min.js')"></script>
 </body>
 </html>

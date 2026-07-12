@@ -57,6 +57,16 @@ if(p&&p.hargaByProdusen&&p.hargaByProdusen[sel.value]){
 document.getElementById('pBeli').value=p.hargaByProdusen[sel.value];
 }
 }
+// kw192-ongkir-produsen-pref: ganti Produsen -> reset Etape1 (jarak/ongkos Ambil ke Produsen) lalu
+// isi ulang dari preferensi produsen yang baru dipilih (kalau ada & panel Ongkir sedang kebuka).
+const ongkirKmEl=document.getElementById('ongkirKmProdusen');
+const ongkirBiayaEl=document.getElementById('ongkirBiayaProdusen');
+if(ongkirKmEl)ongkirKmEl.value='';
+if(ongkirBiayaEl)ongkirBiayaEl.value='';
+if(typeof OngkirCalc!=='undefined'){
+OngkirCalc.prefillFromProdusen();
+OngkirCalc.calc();
+}
 },
 save(){
 const name=document.getElementById('pName').value.trim();
@@ -269,6 +279,138 @@ resellerEl.value=this.roundNice((modal+transport)*(1+resellerMargin/100));
 toast('✅ Harga Jual (& Reseller kalau kosong) terisi dari rekomendasi');
 }
 };
+// OngkirCalc — kalkulator biaya angkut berdasarkan jarak, dipakai buat isi "Biaya Transport/Unit"
+// di panel PriceReko di atas (kw190-ongkir-jarak). Rute bisnis cobek: [Ambil ke Produsen] -> [Pekalongan]
+// -> lalu opsional [Pekalongan -> Rumah Konsumen] kalau diantar, atau berhenti di Pekalongan kalau
+// konsumen ambil sendiri. Formula per etape: (Ongkos/km × Jarak km PP) ÷ Jumlah pcs yang diangkut
+// sekali jalan — makin banyak pcs dibawa dalam 1x jalan, makin murah ongkos per pcs-nya. Total biaya
+// transport per pcs = jumlah semua etape yang dipakai (etape 2 di-skip kalau metode "ambil sendiri").
+const OngkirCalc={
+_metode:'antar',
+_result:0,
+// kw192-ongkir-produsen-pref: preferensi jarak & ongkos/km Etape 1 (Ambil ke Produsen) disimpan
+// per Produsen (D.produsen[].jarakKm/biayaPerKm) supaya user tidak perlu isi ulang jarak yang sama
+// tiap kali buka panel ini utk produk dari produsen yg sama — rute ke 1 produsen kan tetap sama.
+// Etape 2 (Pekalongan->Rumah Konsumen) SENGAJA tidak disimpan krn beda-beda tiap order/konsumen.
+getProdusenId(){
+return document.getElementById('pProdusen')?.value||'';
+},
+prefillFromProdusen(){
+const produsenId=this.getProdusenId();
+const pr=produsenId?D.produsen.find(x=>x.id===produsenId):null;
+const kmEl=document.getElementById('ongkirKmProdusen');
+const biayaEl=document.getElementById('ongkirBiayaProdusen');
+const hint=document.getElementById('ongkirProdusenPrefHint');
+if(pr&&pr.jarakKm>0){
+if(kmEl&&!kmEl.value)kmEl.value=pr.jarakKm;
+if(biayaEl&&!biayaEl.value&&pr.biayaPerKm>0)biayaEl.value=pr.biayaPerKm;
+if(hint)hint.textContent=`📍 Rute tersimpan utk ${pr.name}: ${pr.jarakKm} km${pr.biayaPerKm>0?' × '+fmt(pr.biayaPerKm)+'/km':''} — otomatis terisi, edit bebas kalau beda & simpan ulang kalau perlu.`;
+} else if(hint){
+hint.textContent=pr?`💡 Belum ada rute tersimpan utk ${pr.name} — isi jarak & ongkos di bawah, lalu "💾 Simpan" biar tidak perlu isi ulang lain kali.`:'';
+}
+},
+saveProdusenPref(){
+const produsenId=this.getProdusenId();
+if(!produsenId){toast('⚠️ Pilih Produsen dulu di atas (bukan "Tanpa produsen")');return;}
+const pr=D.produsen.find(x=>x.id===produsenId);
+if(!pr){toast('⚠️ Produsen tidak ditemukan');return;}
+const km=parseFloat(document.getElementById('ongkirKmProdusen')?.value)||0;
+const biaya=parseFloat(document.getElementById('ongkirBiayaProdusen')?.value)||0;
+if(km<=0){toast('⚠️ Isi Jarak (km) Etape 1 dulu sebelum disimpan');return;}
+pr.jarakKm=km;
+pr.biayaPerKm=biaya;
+save();
+this.prefillFromProdusen();
+toast(`✅ Rute ke ${pr.name} disimpan (${km} km${biaya>0?' × '+fmt(biaya)+'/km':''}) — otomatis terisi lain kali`);
+},
+leg(biayaPerKm,jarakKm,pcs){
+const rp=parseFloat(biayaPerKm)||0;
+const km=parseFloat(jarakKm)||0;
+const n=parseFloat(pcs)||0;
+if(n<=0)return 0;
+return(rp*km)/n;
+},
+toggle(){
+const panel=document.getElementById('ongkirCalcPanel');
+if(!panel)return;
+const willOpen=panel.classList.contains('u-dnone');
+panel.classList.toggle('u-dnone');
+if(willOpen){this.prefillFromProdusen();this.calc();}
+},
+setMetode(metode,el){
+this._metode=metode;
+document.querySelectorAll('#ongkirMetodeToggle .chip-btn').forEach(b=>b.classList.remove('active'));
+if(el)el.classList.add('active');
+const etape2=document.getElementById('ongkirEtape2Fields');
+if(etape2)etape2.style.opacity=metode==='ambil'?'0.4':'1';
+const kmEl=document.getElementById('ongkirKmKonsumen'),biayaEl=document.getElementById('ongkirBiayaKonsumen');
+if(kmEl)kmEl.disabled=metode==='ambil';
+if(biayaEl)biayaEl.disabled=metode==='ambil';
+this.calc();
+},
+calc(){
+const pcs=parseFloat(document.getElementById('ongkirPcs')?.value)||0;
+const kmProdusen=document.getElementById('ongkirKmProdusen')?.value;
+const biayaProdusen=document.getElementById('ongkirBiayaProdusen')?.value;
+const kmKonsumen=document.getElementById('ongkirKmKonsumen')?.value;
+const biayaKonsumen=document.getElementById('ongkirBiayaKonsumen')?.value;
+const legProdusen=this.leg(biayaProdusen,kmProdusen,pcs);
+const legKonsumen=this._metode==='antar'?this.leg(biayaKonsumen,kmKonsumen,pcs):0;
+const total=legProdusen+legKonsumen;
+this._result=total;
+const resEl=document.getElementById('ongkirResult');
+if(resEl)resEl.textContent=fmtFull(Math.round(total));
+const bdEl=document.getElementById('ongkirBreakdown');
+if(bdEl){
+if(pcs<=0){bdEl.textContent='Isi jumlah pcs yang diangkut dulu';}
+else{
+const parts=[`Ambil-Produsen ${fmt(Math.round(legProdusen))}/pcs`];
+if(this._metode==='antar')parts.push(`Pekalongan-Rumah ${fmt(Math.round(legKonsumen))}/pcs`);
+bdEl.textContent=parts.join(' + ')+` (÷ ${pcs} pcs sekali jalan)`;
+}
+}
+return total;
+},
+applyToTransport(){
+const total=this.calc();
+if(!total){toast('⚠️ Isi jarak, ongkos/km, & jumlah pcs dulu');return;}
+const rounded=Math.round(total/100)*100;
+const t=document.getElementById('prkTransport');
+if(t)t.value=rounded;
+PriceReko.calc();
+toast(`✅ Biaya Transport/Unit diisi ${fmtFull(rounded)} dari hitungan jarak`);
+},
+// autoFillBiaya — "🔄 Isi dari rata-rata BBM" versi OngkirCalc (kw191-ongkir-jarak). Beda dari
+// PriceReko.autoFillTransport() (yg cuma pakai harga/liter mentah sbg tebakan kasar): di sini dihitung
+// SUNGGUHAN dari konsumsi BBM kendaraan (km/liter, lihat estimateRpPerKm() di
+// features-tukang-kendaraan-storage.js) supaya Ongkos/km lebih akurat drpd isi manual tebak-tebak.
+// Isi KEDUA field Ongkos/km (Etape 1 & 2) sekaligus krn nilainya sama (ongkos per km kendaraan yg
+// dipakai, terlepas dari etape mana) -- field jarak & jumlah pcs TETAP harus diisi manual krn beda2
+// per order.
+async autoFillBiaya(){
+const vehicles=D.vehicles||[];
+if(!vehicles.length){toast('⚠️ Belum ada data kendaraan di Catatan Mobil');return;}
+let vehicleId;
+if(vehicles.length===1){
+vehicleId=vehicles[0].id;
+}else{
+const idx=await showChoiceModal({title:'Pakai Kendaraan Mana?',message:'Pilih kendaraan yg dipakai buat angkut barang, biar Ongkos/km dihitung dari konsumsi BBM kendaraan itu.',choices:vehicles.map(v=>({label:`${v.emoji} ${v.name}`}))});
+if(idx===null)return;
+vehicleId=vehicles[idx].id;
+}
+const veh=vehicles.find(v=>v.id===vehicleId);
+const est=(typeof estimateRpPerKm==='function')?estimateRpPerKm(vehicleId):null;
+if(!est){toast(`⚠️ Data BBM ${veh?veh.name:'kendaraan ini'} belum cukup (butuh min. 2 catatan "Isi Full Tank" dgn KM naik) — isi manual dulu ya`,6000);return;}
+const rounded=Math.round(est.rpPerKm);
+const p=document.getElementById('ongkirBiayaProdusen');
+const k=document.getElementById('ongkirBiayaKonsumen');
+if(p)p.value=rounded;
+if(k)k.value=rounded;
+this.calc();
+const kmPerLiterStr=est.kmPerLiter.toFixed(1);
+toast(`✅ Ongkos/km diisi ${fmtFull(rounded)} dari konsumsi ${veh?veh.name:''} (≈${kmPerLiterStr} km/liter, harga BBM ${fmtFull(Math.round(est.avgHarga))}/liter)`,7000);
+}
+};
 // PriceRekoWidget — widget dashboard "🤖 Rekomendasi Harga Jual AI" di tab Etalase (kartu di atas
 // daftar produk). Beda dari PriceReko di atas (yang manual, per-produk, di dalam productModal):
 // widget ini SCAN OTOMATIS semua produk yang sudah punya Harga Beli & Harga Jual, bandingkan Harga
@@ -298,12 +440,23 @@ const marginPct=this.avgMarginForKategori(p.kategoriId,p.id);
 const base=(p.hargaBeli||0)+transport;
 return PriceReko.roundNice(base*(1+marginPct/100));
 },
-scan(){
-return(D.products||[]).filter(p=>p.hargaBeli>0&&p.hargaJual>0).map(p=>{
+// checkOne(p) — versi per-produk dari scan(), dipakai bareng di sini (Etalase) & di titik jual
+// (Kasir/Order, lihat kasir.js & Order.renderItems di bawah) supaya SATU rumus rekomendasi yg
+// sama dipakai konsisten di semua tempat, bukan reimplementasi terpisah. Balikin null kalau
+// produk belum punya Harga Beli/Jual, atau kalau selisihnya masih di bawah THRESHOLD_PCT.
+checkOne(p){
+if(!p||!(p.hargaBeli>0)||!(p.hargaJual>0))return null;
 const reko=this.recommend(p);
-const diffPct=reko>0?((p.hargaJual-reko)/reko)*100:0;
-return{product:p,reko,diffPct};
-}).filter(x=>x.reko>0&&Math.abs(x.diffPct)>=this.THRESHOLD_PCT)
+if(!(reko>0))return null;
+const diffPct=((p.hargaJual-reko)/reko)*100;
+if(Math.abs(diffPct)<this.THRESHOLD_PCT)return null;
+return{reko,diffPct};
+},
+scan(){
+return(D.products||[]).map(p=>{
+const chk=this.checkOne(p);
+return chk?{product:p,reko:chk.reko,diffPct:chk.diffPct}:null;
+}).filter(Boolean)
 .sort((a,b)=>Math.abs(b.diffPct)-Math.abs(a.diffPct));
 },
 render(){
@@ -456,9 +609,11 @@ if(!D.produsen.length){el.innerHTML='<div class="empty"><div class="empty-icon">
 el.innerHTML=D.produsen.map(pr=>{
 const products=D.products.filter(p=>p.hargaByProdusen&&p.hargaByProdusen[pr.id]!==undefined);
 const hargaInfo=products.length?products.map(p=>`${escapeHtml(p.name)}: ${fmt(p.hargaByProdusen[pr.id])}`).join(', '):'Belum ada harga produk';
+// kw192-ongkir-produsen-pref: tampilkan rute Etape1 tersimpan (kalau ada) sbg info tambahan
+const ruteInfo=pr.jarakKm>0?`📍 ${pr.jarakKm} km${pr.biayaPerKm>0?' × '+fmt(pr.biayaPerKm)+'/km':''} · `:'';
 return`<div class="tx-item">
         <div class="tx-icon" style="background:var(--accent2-soft)">🏭</div>
-        <div class="tx-info"><div class="tx-name">${escapeHtml(pr.name)}</div><div class="tx-meta">${pr.contact?'📞 '+escapeHtml(pr.contact)+' · ':''}${escapeHtml(hargaInfo)}</div></div>
+        <div class="tx-info"><div class="tx-name">${escapeHtml(pr.name)}</div><div class="tx-meta">${pr.contact?'📞 '+escapeHtml(pr.contact)+' · ':''}${ruteInfo}${escapeHtml(hargaInfo)}</div></div>
         <button class="tx-del u-cacc3" style="background:var(--accent3-soft);margin-right:6px" data-action="openProdusenHargaModal" data-args="${escapeHtml(JSON.stringify([pr.id]))}" aria-label="Edit/Buka">💰</button>
         <button class="tx-del u-bgaccsoft u-cacc" style="margin-right:6px" data-action="openProdusenModal" data-args="${escapeHtml(JSON.stringify([pr.id]))}" aria-label="Edit/Buka">✏️</button>
         <button class="tx-del" data-action="delProdusen" data-args="${escapeHtml(JSON.stringify([pr.id]))}" aria-label="Hapus">🗑</button>
@@ -604,7 +759,13 @@ return{lines,subtotal,modal,diskon,ongkir,total,profit};
 renderItems(){
 const{lines,total,profit}=Order.computeTotals();
 const el=document.getElementById('orderItemList');
-el.innerHTML=lines.length?lines.map((l,i)=>`
+el.innerHTML=lines.length?lines.map((l,i)=>{
+// Reko harga (kw194-kasir-order-pricereko): pakai rumus PriceRekoWidget yg sama dgn widget
+// "🤖 Rekomendasi Harga Jual AI" di Etalase, biar kelihatan di titik jual (bukan cuma pas
+// buka Etalase) kalau Harga Jual produk ini sudah menyimpang jauh dari estimasi.
+const priceChk=(typeof PriceRekoWidget!=='undefined')?PriceRekoWidget.checkOne(l.product):null;
+const priceHint=priceChk?`<div class="u-mt2" style="font-size:11px;color:${priceChk.diffPct<0?'var(--accent2)':'var(--accent4)'};font-weight:600">${priceChk.diffPct<0?'⬇️':'⬆️'} Reko Etalase: ${fmt(priceChk.reko)} <span class="u-t2" style="font-weight:400;cursor:pointer;text-decoration:underline" data-action="openPriceRekoWidgetDetail" data-args="${escapeHtml(JSON.stringify([l.productId]))}">detail →</span></div>`:'';
+return`
       <div class="tx-item">
         <div class="tx-icon u-bgaccsoft">🪨</div>
         <div class="tx-info">
@@ -613,6 +774,7 @@ el.innerHTML=lines.length?lines.map((l,i)=>`
             <input type="number" class="fi u-fs12" value="${l.harga}" oninput="updateOrderItemHarga(${i},this.value)" placeholder="${l.hargaDefault}" inputmode="numeric" style="width:90px;padding:5px 7px" title="Harga bisa diedit manual per transaksi (mis. nego/diskon)">
             <span>x ${l.qty}${l.hargaOverride!=null&&l.hargaOverride>0&&l.hargaOverride!==l.hargaDefault?' <span class="u-cacc4">(diedit, default '+fmt(l.hargaDefault)+')</span>':''}</span>
           </div>
+          ${priceHint}
         </div>
         <div class="u-flex u-aic u-gap6">
           <button class="btn btn-ghost btn-sm" style="padding:4px 10px" data-action="changeOrderQty" data-args="${escapeHtml(JSON.stringify([i, -1]))}" aria-label="Kurangi jumlah">−</button>
@@ -620,7 +782,8 @@ el.innerHTML=lines.length?lines.map((l,i)=>`
           <button class="btn btn-ghost btn-sm" style="padding:4px 10px" data-action="changeOrderQty" data-args="${escapeHtml(JSON.stringify([i, 1]))}" aria-label="Tambah jumlah">+</button>
         </div>
         <button class="tx-del" data-action="removeOrderItem" data-args="${escapeHtml(JSON.stringify([i]))}" aria-label="Hapus">🗑</button>
-      </div>`).join(''):'<div class="empty"><div class="empty-text">Keranjang masih kosong</div></div>';
+      </div>`;
+}).join(''):'<div class="empty"><div class="empty-text">Keranjang masih kosong</div></div>';
 document.getElementById('oTotalDisplay').textContent=fmtFull(total);
 document.getElementById('oProfitDisplay').textContent='Estimasi untung: '+fmtFull(profit);
 },
@@ -1190,6 +1353,123 @@ function openProductModal(idx){return Etalase.openModal(idx);}
 function onPProdusenChange(){return Etalase.onProdusenChange();}
 function saveProduct(){return Etalase.save();}
 function delProduct(i){return Etalase.delete(i);}
+
+// ImportKatalog (kw200-import-katalog-harga): import massal produk+harga dari teks yang ditempel
+// (mis. daftar harga reseller dari WA/supplier). Baris tanpa harga di akhir dianggap header
+// kategori (berlaku utk baris2 sesudahnya sampai ketemu header baru). Baris dgn harga di akhir
+// (format "Rp30.000", "30.000", atau "60rb") jadi 1 produk. Produk yg namanya sudah ada (cocok
+// case-insensitive) di-UPDATE harganya, bukan bikin duplikat. Tidak membuat transaksi pengeluaran
+// apapun (beda dari Etalase.save) — stok produk baru = 0, isi manual lewat Kasir Isi Stok kalau perlu.
+const ImportKatalog={
+parsed:[],
+target:'reseller',
+open(){
+this.parsed=[];
+this.target='reseller';
+const ta=document.getElementById('importKatalogText');
+if(ta)ta.value='';
+const box=document.getElementById('importKatalogPreview');
+if(box)box.innerHTML='';
+document.querySelectorAll('#importKatalogTargetToggle .chip-btn').forEach(b=>b.classList.remove('active'));
+const defBtn=document.getElementById('importKatalogTargetReseller');
+if(defBtn)defBtn.classList.add('active');
+const btn=document.getElementById('importKatalogCommitBtn');
+if(btn)btn.disabled=true;
+openModal('importKatalogModal');
+},
+setTarget(target,el){
+this.target=target;
+document.querySelectorAll('#importKatalogTargetToggle .chip-btn').forEach(b=>b.classList.remove('active'));
+if(el)el.classList.add('active');
+},
+_parsePrice(tok){
+const isRibu=/(rb|ribu|k)\s*$/i.test(tok.trim());
+const digits=tok.replace(/[^\d]/g,'');
+if(!digits)return 0;
+let num=parseInt(digits,10);
+if(isRibu)num=num*1000;
+return num;
+},
+_parse(text){
+const lines=text.split(/\r?\n/);
+let currentCat='';
+const items=[];
+const priceLineRe=/^(.+?)[ \t]+((?:Rp\.?\s*)?\d[\d.,]*\s*(?:rb|ribu|k)?)\s*$/i;
+for(const raw of lines){
+const line=raw.trim();
+if(!line)continue;
+const m=line.match(priceLineRe);
+if(m){
+const name=m[1].trim();
+const price=this._parsePrice(m[2]);
+if(name&&price>0)items.push({name,price,kategori:currentCat});
+} else {
+currentCat=line;
+}
+}
+return items;
+},
+preview(){
+const ta=document.getElementById('importKatalogText');
+const text=ta?ta.value:'';
+if(!text.trim()){toast('⚠️ Tempel dulu daftar harga di kotak teks');return;}
+const items=this._parse(text);
+this.parsed=items;
+const box=document.getElementById('importKatalogPreview');
+const btn=document.getElementById('importKatalogCommitBtn');
+if(!box)return;
+if(!items.length){
+box.innerHTML='<div class="u-fs12 u-t2">Tidak ada baris harga yang kebaca. Format per baris: "Nama Produk[spasi/tab]Rp30.000" atau "Nama Produk 60rb". Baris tanpa harga dianggap nama kategori utk baris2 sesudahnya.</div>';
+if(btn)btn.disabled=true;
+return;
+}
+const grouped={};
+items.forEach(it=>{
+const key=it.kategori||'(Tanpa Kategori)';
+if(!grouped[key])grouped[key]=[];
+grouped[key].push(it);
+});
+let html=`<div class="u-fs12 u-t2 u-mb8">${items.length} produk kebaca dari ${Object.keys(grouped).length} kategori.</div>`;
+Object.keys(grouped).forEach(kat=>{
+html+=`<div class="u-fs11 u-t2" style="font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin:10px 0 4px">${escapeHtml(kat)}</div>`;
+grouped[kat].forEach(it=>{
+const exists=D.products.find(p=>p.name.toLowerCase()===it.name.toLowerCase());
+const statusLabel=exists?'🔄 update':'🆕 baru';
+html+=`<div style="display:flex;justify-content:space-between;gap:8px;padding:4px 0;border-bottom:1px solid var(--border);font-size:12px"><span>${escapeHtml(it.name)}</span><span style="white-space:nowrap">${fmtFull(it.price)} <span class="u-t2">(${statusLabel})</span></span></div>`;
+});
+});
+box.innerHTML=html;
+if(btn)btn.disabled=false;
+},
+commit(){
+if(!this.parsed||!this.parsed.length){toast('⚠️ Klik Pratinjau dulu sebelum Import');return;}
+let created=0,updated=0;
+this.parsed.forEach(it=>{
+const kategoriId=it.kategori?resolveShopKategori(it.kategori):'';
+let product=D.products.find(p=>p.name.toLowerCase()===it.name.toLowerCase());
+if(product){
+product.hargaJual=it.price;
+if(this.target==='reseller')product.hargaReseller=it.price;
+else if(this.target==='beli')product.hargaBeli=it.price;
+if(kategoriId)product.kategoriId=kategoriId;
+updated++;
+} else {
+product={id:'prod_'+Date.now()+'_'+uid(),name:it.name,stock:0,hargaBeli:(this.target==='beli'?it.price:0),hargaJual:it.price,hargaReseller:(this.target==='reseller'?it.price:null),diskonPersen:0,kategoriId,produsenId:'',hargaByProdusen:{}};
+D.products.push(product);
+created++;
+}
+});
+save();
+closeModal('importKatalogModal');
+renderProductList();
+toast(`✅ Import selesai: ${created} produk baru, ${updated} diperbarui`);
+this.parsed=[];
+}
+};
+function openImportKatalogModal(){return ImportKatalog.open();}
+function previewImportKatalog(){return ImportKatalog.preview();}
+function setImportKatalogTarget(target,el){return ImportKatalog.setTarget(target,el);}
+function commitImportKatalog(){return ImportKatalog.commit();}
 function applyPriceRekoWidgetOne(id){return PriceRekoWidget.applyOne(id);}
 function openPriceRekoWidgetDetail(id){return PriceRekoWidget.openDetail(id);}
 function openStockRekoWidgetDetail(id,restockQty){return StockRekoWidget.openDetail(id,restockQty);}

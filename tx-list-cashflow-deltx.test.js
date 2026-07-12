@@ -4,11 +4,11 @@ const assert = require('node:assert/strict');
 const { loadSource } = require('./helpers/loadSource');
 
 // Cakupan file ini: `delTx` (hapus transaksi + efek samping lintas-modul:
-// stok produk, Cobek/Shop, catatan servis, Renov, WorthIt, SewaKios,
+// stok produk, Shop/Shop, catatan servis, Renov, WorthIt, SewaKios,
 // Tukang) & `computeCashflowForecast` dari tx-list-cashflow.js. Dipisah
 // dari tx-list-cashflow-render.test.js (lihat komentar di file itu) karena
 // dua fungsi ini butuh mock dependency yg jauh lebih banyak/berat
-// (askConfirm, D.products/cobek/servisLogs/bbmLogs, Renov/WorthIt/
+// (askConfirm, D.products/shop/servisLogs/bbmLogs, Renov/WorthIt/
 // SewaKios/Tukang, BudgetReko) dibanding fungsi render/filter yg cukup
 // stub DOM sederhana.
 
@@ -24,8 +24,8 @@ function makeDelTxCtx(D, opts = {}) {
     renderKeuangan: record('renderKeuangan'),
     renderCnTab: record('renderCnTab'),
     renderProductList: record('renderProductList'),
-    renderCobek: record('renderCobek'),
-    renderCobekRecent: record('renderCobekRecent'),
+    renderShop: record('renderShop'),
+    renderShopRecent: record('renderShopRecent'),
     renderStockList: record('renderStockList'),
     revertStockUsage: (...args) => calls.revertStockUsage.push(args),
     Renov: { onLinkedTxDeleted: (...args) => calls.renov.push(args) },
@@ -145,7 +145,7 @@ test('delTx — stockProductId tapi produknya sudah tidak ada di D.products: tid
 
 // ================= delTx — cobekLinkId =================
 
-test('delTx — tx dgn cobekLinkId & cobek terkait punya items: stok dikembalikan, entry cobek dihapus, render Cobek dipanggil, tanpa toast generik', async () => {
+test('delTx — tx dgn cobekLinkId & shop terkait punya items: stok dikembalikan, entry shop dihapus, render Shop dipanggil, tanpa toast generik', async () => {
   const D = {
     transactions: [{ id: 't1', cobekLinkId: 'c1' }],
     cobek: [{ id: 'c1', items: [{ productId: 'p1', qty: 5 }] }],
@@ -156,13 +156,13 @@ test('delTx — tx dgn cobekLinkId & cobek terkait punya items: stok dikembalika
   assert.equal(D.products.find((p) => p.id === 'p1').stock, 15);
   assert.equal(D.cobek.length, 0);
   const names = calls.render.map((r) => r[0]);
-  assert.ok(names.includes('renderCobek'));
-  assert.ok(names.includes('renderCobekRecent'));
+  assert.ok(names.includes('renderShop'));
+  assert.ok(names.includes('renderShopRecent'));
   assert.ok(calls.toast.some((m) => /Stok dikembalikan/.test(m)));
   assert.ok(!calls.toast.includes('🗑 Dihapus'));
 });
 
-test('delTx — cobekLinkId tapi entry cobek sudah tidak ketemu di D.cobek: tetap render Cobek, tanpa toast stok, tanpa toast generik', async () => {
+test('delTx — cobekLinkId tapi entry shop sudah tidak ketemu di D.cobek: tetap render Shop, tanpa toast stok, tanpa toast generik', async () => {
   const D = {
     transactions: [{ id: 't1', cobekLinkId: 'c-hilang' }],
     cobek: [{ id: 'c-lain', items: [] }],
@@ -171,8 +171,8 @@ test('delTx — cobekLinkId tapi entry cobek sudah tidak ketemu di D.cobek: teta
   await ctx.delTx('t1');
   assert.equal(D.cobek.length, 1); // c-lain tetap ada, filter cobekLinkId tidak match apapun
   const names = calls.render.map((r) => r[0]);
-  assert.ok(names.includes('renderCobek'));
-  assert.equal(calls.toast.length, 0); // tidak match linkedCobek => tidak ada toast stok; cobekLinkId set => toast generik ikut ditekan
+  assert.ok(names.includes('renderShop'));
+  assert.equal(calls.toast.length, 0); // tidak match linkedShop => tidak ada toast stok; cobekLinkId set => toast generik ikut ditekan
 });
 
 // ================= delTx — servisLinkId =================

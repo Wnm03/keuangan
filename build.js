@@ -162,6 +162,40 @@ function bumpVersionEverywhere(oldV, newV) {
   return changed;
 }
 
+// 2b. Verifikasi KERAS bahwa setiap konstanta *_VERSION yang dicek runtime lewat
+// computeModuleSyncStatus()/_checkModuleVersionSync() (diagnostik-versi.js) BENAR-BENAR
+// bernilai versi baru setelah bumpVersionEverywhere(). Ini jaring pengaman utk bug class
+// "modals.js MODAL_VERSION diam-diam ketinggalan versi lama yang sudah tidak dipakai file
+// lain" (ditemukan 2026-07-12) — bumpVersionEverywhere() cuma cari-ganti STRING oldV, jadi
+// kalau satu file punya konstanta versi yang isinya SUDAH menyimpang dari oldV (mis. pernah
+// ditulis manual jadi label custom spt 'kw200-import-katalog-harga'), file itu tidak pernah
+// match content.includes(oldV) dan SELAMANYA tidak ke-update, TANPA build pernah melapor
+// error apa pun — baru ketahuan dari warning runtime di console browser. Fungsi ini menutup
+// celah itu: build SEKARANG GAGAL EKSPLISIT kalau ada konstanta yang tidak sinkron, alih-alih
+// diam-diam lolos.
+const VERSION_CONSTANTS_TO_VERIFY = [
+  { file: 'modules-render.js', varName: 'MODULE_RENDER_VERSION' },
+  { file: 'modals.js', varName: 'MODAL_VERSION' },
+  { file: 'modules-calc.js', varName: 'MODULE_CALC_VERSION' },
+  { file: 'features-budget-laporan-carnotes-pelanggan.js', varName: 'MODULE_FEATURES_VERSION' },
+  { file: 'features-helpers-global-security.js', varName: 'APP_BUILD_VERSION' },
+  { file: 'features-helpers-global-security.js', varName: 'PRODUCTION_BUILD_SYNCED_VERSION' },
+];
+function verifyVersionConstantsSynced(newV) {
+  const problems = [];
+  for (const { file, varName } of VERSION_CONSTANTS_TO_VERIFY) {
+    const content = readFile(file);
+    const re = new RegExp(varName + "\\s*=\\s*'([^']+)'");
+    const m = content.match(re);
+    if (!m) {
+      problems.push(`${file}: konstanta ${varName} tidak ditemukan sama sekali (nama variabel berubah?)`);
+    } else if (m[1] !== newV) {
+      problems.push(`${file}: ${varName}='${m[1]}' (seharusnya '${newV}') — kemungkinan nilai lama sudah menyimpang dari versi sebelumnya sehingga tidak ikut ke-replace oleh bumpVersionEverywhere()`);
+    }
+  }
+  return problems;
+}
+
 // 3. Minifikasi opsional lewat esbuild (kalau terpasang), fallback ke gabungan mentah
 function minify(code) {
   try {
@@ -630,6 +664,19 @@ function main() {
 
   const changedFiles = bumpVersionEverywhere(oldVersion, newVersion);
   console.log(`✓ Versi disamakan di ${changedFiles.length} file source: ${changedFiles.join(', ')}`);
+
+  const versionSyncProblems = verifyVersionConstantsSynced(newVersion);
+  if (versionSyncProblems.length) {
+    console.error(`\n❌ BUILD DIHENTIKAN — ${versionSyncProblems.length} konstanta versi TIDAK sinkron setelah bump:\n`);
+    versionSyncProblems.forEach((p) => console.error('  - ' + p));
+    console.error(
+      '\nPerbaiki manual konstanta di atas supaya nilainya persis \'' + newVersion + '\', ' +
+      'lalu jalankan ulang node build.js. (Lihat catatan di verifyVersionConstantsSynced() ' +
+      'utk kenapa ini bisa terjadi walau bumpVersionEverywhere() sudah jalan.)'
+    );
+    process.exit(1);
+  }
+  console.log('✓ Semua konstanta versi (MODULE_RENDER_VERSION/MODAL_VERSION/MODULE_CALC_VERSION/MODULE_FEATURES_VERSION/APP_BUILD_VERSION/PRODUCTION_BUILD_SYNCED_VERSION) terverifikasi sinkron\n');
 
   const resA = buildBundle(GROUP_A, 'app-bundle-a.min.js', oldVersion);
   const resB = buildBundle(GROUP_B, 'app-bundle-b.min.js', oldVersion);

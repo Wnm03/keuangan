@@ -1,5 +1,5 @@
 
-const MODULE_CALC_VERSION='kw83-test-pengaturan-search-5';
+const MODULE_CALC_VERSION='kw83-test-pengaturan-search-23';
 const FI={
 assetScopeState:'zakatable',
 investmentAssetValue(){

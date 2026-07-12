@@ -2,7 +2,7 @@
 // PENTING: file ini HARUS dimuat sesuai urutan build.js (GROUP_A/GROUP_B) karena beberapa modul saling referensi. Urutan grup ini: pajak-pbb-zakat.js, features-budget-laporan-carnotes-pelanggan.js, edukasi-dana.js, sewakios.js, hidup-seimbang.js, linktx.js, renovasi.js, aset.js, worthit.js
 // CATATAN: MODULE_FEATURES_VERSION, VEHTAX_INPUT_IDS, MY_WRENCH, CHAT_ACTION_LABELS DIPINDAH ke sini dari features-etalase-piutang-renovai.js (file itu dihapus, sisa 3 konstanta kecilnya sudah tidak punya file sendiri lagi — semua ditaruh dekat kode yang benar-benar memakainya di domain ini: VEHTAX_INPUT_IDS dekat VEHTAX_ITEMS, MY_WRENCH dekat modul Torsi, CHAT_ACTION_LABELS dekat CHAT_ACTION_HANDLERS/CHAT_ACTION_EDIT_FIELDS).
 
-const MODULE_FEATURES_VERSION='kw83-test-pengaturan-search-5';
+const MODULE_FEATURES_VERSION='kw83-test-pengaturan-search-23';
 const Budget={
 editId:null,
 curIcon:'🍚',
@@ -778,7 +778,7 @@ if(!bbmMoreWrap){
 bbmMoreWrap=document.createElement('div');
 bbmMoreWrap.id='bbmListLoadMoreWrap';
 bbmMoreWrap.style.cssText='text-align:center;margin-top:10px';
-bbmMoreWrap.innerHTML='<button class="btn btn-ghost btn-sm" data-action="loadMoreBbmList"></button>';
+bbmMoreWrap.innerHTML='<button class="btn btn-ghost btn-sm" data-action="loadMoreBbmList" aria-label="Tampilkan lebih banyak riwayat BBM"></button>';
 el.insertAdjacentElement('afterend',bbmMoreWrap);
 }
 if(visibleCount<sorted.length){
@@ -1046,7 +1046,7 @@ if(!servisMoreWrap){
 servisMoreWrap=document.createElement('div');
 servisMoreWrap.id='servisListLoadMoreWrap';
 servisMoreWrap.style.cssText='text-align:center;margin-top:10px';
-servisMoreWrap.innerHTML='<button class="btn btn-ghost btn-sm" data-action="loadMoreServisList"></button>';
+servisMoreWrap.innerHTML='<button class="btn btn-ghost btn-sm" data-action="loadMoreServisList" aria-label="Tampilkan lebih banyak riwayat servis"></button>';
 el.insertAdjacentElement('afterend',servisMoreWrap);
 }
 if(visibleCount<logs.length){
